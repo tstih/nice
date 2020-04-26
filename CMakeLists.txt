@@ -1,0 +1,6 @@
+﻿cmake_minimum_required (VERSION 3.8)
+project(nice)
+if (WIN32)
+	add_definitions(-DUNICODE -DWIN32_LEAN_AND_MEAN)
+	add_executable (nice WIN32 demo.cpp)
+endif()
