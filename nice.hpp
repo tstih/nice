@@ -80,6 +80,57 @@ namespace nice {
 	typedef WPARAM par1;
 	typedef LPARAM par2;
 	typedef LRESULT result;
+	typedef LONG coord; 
+	typedef BYTE byte;
+
+
+	// --- primitive structures -------------------------------------
+	class rct {
+	public:
+		union { coord left; coord x; coord x1; };
+		union { coord top; coord y;  coord y1; };
+		union { coord right; coord x2; };
+		union { coord bottom; coord y2; };
+	};
+
+	class pt {
+	public:
+		union { coord left; coord x; };
+		union { coord top; coord y; };
+	};
+
+	class size {
+	public:
+		union { coord width; coord w; };
+		union { coord height; coord h; };
+	};
+
+	class color {
+	public:
+		byte r;
+		byte g;
+		byte b;
+		byte a;
+	};
+
+	// --- painter --------------------------------------------------
+	class artist {
+	public:
+		void draw_rect(color c, const rct& r) {
+			RECT rect = { r.left, r.top, r.right, r.bottom};
+			HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
+			FrameRect(hdc_, &rect, brush);
+			::DeleteObject(brush);
+		}
+
+
+	private:
+		HDC hdc_; // Windows device context;
+
+		friend class wnd;
+		friend class app_wnd;
+	};
+
 
 
 	// --- window base ----------------------------------------------
@@ -100,6 +151,7 @@ namespace nice {
 		// Events.
 		signal<> created;		// Window created.
 		signal<> destroyed;		// Window destroyed.
+		signal<std::shared_ptr<artist>> paint;
 	protected:
 		// Properties.
 		wnd_id id_;
@@ -150,16 +202,32 @@ namespace nice {
 	result app_wnd::local_wnd_proc(msg_id id, par1 p1, par2 p2) {
 		switch (id)
 		{
+		case WM_ERASEBKGND:
+			break;
+		case WM_PAINT:
+			{
+			PAINTSTRUCT ps;
+			HDC hdc= BeginPaint(this->id(), &ps);
+			auto art = std::make_shared<artist>();
+			art->hdc_ = hdc;
+			paint.emit(art);
+			EndPaint(this->id(), &ps);
+			}
+			break;
+
 		case WM_CREATE:
 			created.emit();
-			return 0;
+			break;
+
 		case WM_DESTROY:
 			destroyed.emit();
 			PostQuitMessage(0);
-			return 0;
+			break;
+
 		default:
 			return ::DefWindowProc(this->id(), id, p1, p2);
 		}
+		return 0;
 	}
 
 

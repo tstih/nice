@@ -11,6 +11,34 @@ void program()
 }
 ~~~
 
+Hello paint in nice:
+~~~
+#include "nice.hpp"
+
+using namespace nice;
+
+class main_wnd : public app_wnd {
+public:
+	main_wnd() : app_wnd(L"Zora zori dan se bijeli.") {
+		// Subscribe to event.
+		paint.connect(this, &main_wnd::on_paint);
+	}
+private:
+	void on_paint(std::shared_ptr<artist> a) const {
+		a->draw_rect({ 255,0,0 }, { 10,10,200,100 });
+	}
+};
+
+void program()
+{
+    nice::app::run(
+		std::static_pointer_cast<nice::app_wnd>(
+			std::make_shared<main_wnd>()
+		)
+	);
+}
+~~~
+
 # Status
 
 ## Done
@@ -18,15 +46,32 @@ void program()
  * transformed into single header library
  * ms windows binding
  * mapping window messages to C++ signals
+ * basic paint proof of concept
 
 ## Implementing
- * wayland binding
+ * standards for pointer use!
+ * gtk+ binding
 
 ## Planning
  * exceptions
  * fluent interface
  * abstracting drawing primitives
  * standard controls (buttons, scrollbars, text edit)
+
+# Dilemmas
+
+## Internal access to members
+
+We are trying to hide platform specific class members. One way to do this is to
+use friend classes for private access, but this causes problems to derived classes
+and can't be a long term solution.
+
+## To Wayland or not to Wayland?
+
+Wayland is draw-only technology, no widgets. Would it be easier to implement on
+top of GTK instead? If not, I'll have to reimplement plenty. But, on the other side,
+I'll create library, capable of begin ported to embedded systems with only basic 2D
+drawing functions.
 
 # How to be nice
 
@@ -95,8 +140,9 @@ typedef LRESULT result;
 
 ## Common structures
 
-size
-rct
+* size size
+* rct rectangle
+* pt point
 
 ## Fluent interface
 
