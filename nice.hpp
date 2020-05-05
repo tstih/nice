@@ -189,7 +189,7 @@ namespace nice {
 	class app_wnd : public wnd
 	{
 	public:
-		app_wnd(std::sting text) : wnd() { text_ = text; class_ = "APP_WND"; }
+		app_wnd(std::string text) : wnd() { text_ = text; class_ = "APP_WND"; }
 		virtual ~app_wnd() {}
 		void conjure();
 	protected:
