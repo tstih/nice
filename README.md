@@ -1,6 +1,9 @@
 # Welcome to nice
 Nice is an experimental modern C++ library for building graphical user interfaces. 
 
+> This is early development. Sometimes things don't compile and are documented poorly. 
+> nice will live up to expectations, just not now. Thank you for your patience.
+
 Hello world in nice:
 ~~~
 #include "nice.hpp"
