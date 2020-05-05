@@ -4,7 +4,7 @@ using namespace nice;
 
 class main_wnd : public app_wnd {
 public:
-	main_wnd() : app_wnd(L"Zora zori dan se bijeli.") {
+	main_wnd() : app_wnd("Zora zori dan se bijeli.") {
 		// Subscribe to event.
 		paint.connect(this, &main_wnd::on_paint);
 	}

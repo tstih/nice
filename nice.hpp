@@ -11,6 +11,7 @@
 extern void program();
 
 // --- signals ------------------------------------------------------
+namespace nice {
 template <typename... Args>
 class signal {
 public:
@@ -49,6 +50,7 @@ private:
 	mutable std::map<int, std::function<void(Args...)>> slots_;
 	mutable int current_id_;
 };
+} // using nice
 
 
 #ifdef _WIN32
@@ -145,8 +147,8 @@ namespace nice {
 
 		// Properties.
 		wnd_id id();
-		void text(std::wstring t);
-		std::wstring text();
+		void text(std::string t);
+		std::string text();
 
 		// Events.
 		signal<> created;		// Window created.
@@ -155,7 +157,7 @@ namespace nice {
 	protected:
 		// Properties.
 		wnd_id id_;
-		std::wstring text_;
+		std::string text_;
 
 		// Map of all existing windows, used by WndProc to delegate messages.
 		static std::map<HWND, wnd*> wnd_map; // TODO: smart pointer logic
@@ -176,7 +178,7 @@ namespace nice {
 
 	wnd_id wnd::id() { return id_; }
 
-	void wnd::text(std::wstring t)
+	void wnd::text(std::string t)
 	{
 		text_ = t;
 	}
@@ -187,13 +189,13 @@ namespace nice {
 	class app_wnd : public wnd
 	{
 	public:
-		app_wnd(std::wstring text) : wnd() { text_ = text; class_ = L"APP_WND"; }
+		app_wnd(std::sting text) : wnd() { text_ = text; class_ = "APP_WND"; }
 		virtual ~app_wnd() {}
 		void conjure();
 	protected:
 		result local_wnd_proc(msg_id id, par1 p1, par2 p2);
 	private:
-		std::wstring class_;
+		std::string class_;
 		WNDCLASSEX wcex_;
 		// Window procedure is a friend function of wnd class.
 		friend LRESULT CALLBACK ::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -336,28 +338,118 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 #elif __linux__ // #ifdef _WIN32
 
-// http://mech.math.msu.su/~nap/2/GWindow/xintro.html
-// https://jan.newmarch.name/Wayland/ProgrammingClient/
-// cc -o connect connect.c -lwayland-client
 
 // --- includes -----------------------------------------------------
-#include <wayland-client.h>
+#include <gtk/gtk.h>
+
+
+namespace nice {
+
+	// --- types ----------------------------------------------------
+	typedef GtkApplication* app_id;
+	typedef GtkWidget* wnd_id;
+
+
+	// --- window base ----------------------------------------------
+	class wnd
+	{
+	public:
+		wnd();
+		virtual ~wnd();
+
+		// Methods.
+		virtual void conjure() = 0;
+
+		// Properties.
+		wnd_id id();
+		void text(std::string t);
+		std::string text();
+
+	protected:
+		// Properties.
+		wnd_id id_;
+		std::string text_;
+	};
+
+	wnd::wnd() : id_{ 0 } {}
+
+	wnd::~wnd() {}
+
+	wnd_id wnd::id() { return id_; }
+
+	void wnd::text(std::string t)
+	{
+		text_ = t;
+	}
+
+
+	// --- application window ---------------------------------------
+	class app_wnd : public wnd
+	{
+	public:
+		app_wnd(std::string text) : wnd() { text_ = text; }
+		virtual ~app_wnd() {}
+	};
+
+
+	// --- application ----------------------------------------------
+	extern static void on_app_activate(GtkApplication *app, gpointer user_data)
+
+	class app
+	{
+	public:
+		static app_id id();
+		static void id(app_id id);
+		static int ret_code();
+		static void run(std::shared_ptr<app_wnd> w);
+
+	private:
+		static app_id id_;
+		static int ret_code_;
+	};
+
+	app_id app::id_{ 0 };
+	int app::ret_code_{ 0 };
+
+	app_id app::id() { return app::id_; }
+	void app::id(app_id id) { app::id_ = id; }
+	int app::ret_code() { return app::ret_code_; }
+
+	void app::run(std::shared_ptr<app_wnd> w) {
+		w->conjure();
+	}
+
+
+	// --- cross reference functions --------------------------------
+	void app_wnd::conjure() {
+		// Create window and set the id.
+		id(gtk_application_window_new (app::id()));
+  		gtk_window_set_title (GTK_WINDOW (id()), text());
+  		gtk_window_set_default_size (GTK_WINDOW (id()), 200, 200);
+  		gtk_widget_show (id());
+	}
+}
 
 // --- startup code -------------------------------------------------
-int main(int argc, char** argv) {
-
-	// Connect.
-	struct wl_display*  display = wl_display_connect(NULL);
-	if (display == NULL) {} // TODO: exception.
-	
-	// Run main program.
+static void on_app_activate(GtkApplication *app, gpointer user_data) {
 	program();
+}
 
-	// Disconnect.
-	wl_display_disconnect(display);
+int main(int argc, char **argv) {
+    
+	// Set application id.
+	nice::app::id(gtk_application_new("nice.app", G_APPLICATION_FLAGS_NONE));
 
-	// And return success;
-	return nice::app::ret_code();
+	// Connect app. activation to on_app_activate.
+	g_signal_connect(app::id(), "activate", G_CALLBACK(on_app_activate), NULL);
+    auto status = g_application_run(G_APPLICATION(nice::app:id()), argc, argv);
+    g_object_unref(app::id());
+
+	// Finally, set the return code.
+	app::ret_code_ = status;
+
+	// And return it.
+    return nice::app::ret_code();
 }
 
 #endif // #elif __linux__

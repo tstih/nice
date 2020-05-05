@@ -39,6 +39,31 @@ void program()
 }
 ~~~
 
+# Compiling
+
+## Windows
+
+Install Visual Studio 64bit compilers, and cmake. 
+
+~~~
+cmake .
+make
+~~~
+
+## Linux
+
+nice depends on GTK3 library. Install it to your machine if
+not already installed.
+
+`sudo apt install libgtk-3-dev`
+
+Then do 
+
+~~~
+cmake .
+make
+~~~
+
 # Status
 
 ## Done
@@ -47,15 +72,17 @@ void program()
  * ms windows binding
  * mapping window messages to C++ signals
  * basic paint proof of concept
+ * abstracting drawing primitives
 
 ## Implementing
- * standards for pointer use!
  * gtk+ binding
+ * standards for pointer use!
 
 ## Planning
+ * refactoring no 1
  * exceptions
  * fluent interface
- * abstracting drawing primitives
+ * refactoring no 2
  * standard controls (buttons, scrollbars, text edit)
 
 # Dilemmas
