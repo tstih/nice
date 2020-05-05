@@ -10,7 +10,7 @@ Hello world in nice:
 
 void program()
 {
-    nice::app::run(std::make_shared<nice::app_wnd>(L"Hello world!"));
+    nice::app::run(std::make_shared<nice::app_wnd>("Hello world!"));
 }
 ~~~
 
@@ -22,7 +22,7 @@ using namespace nice;
 
 class main_wnd : public app_wnd {
 public:
-	main_wnd() : app_wnd(L"Zora zori dan se bijeli.") {
+	main_wnd() : app_wnd("Hello paint!") {
 		// Subscribe to event.
 		paint.connect(this, &main_wnd::on_paint);
 	}
