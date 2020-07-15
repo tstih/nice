@@ -134,14 +134,22 @@ make
  * refactoring no 1
 
 ## Implementing
- * standard controls (buttons, scrollbars, text edit)
+ * standard controls (button, text edit, etc.)
 
 ## Planning
  * exceptions
  * refactoring no 2
  * gtk+ binding
+ * custom controls
+ * refactoring no 3
 
 # Dilemmas
+
+## Clean non-native interface
+
+Thinking about it. All classes have some native members, which must be protected 
+(visible in derived classes) in order for the system to work. I'd like to somehow
+hide them, but so far I don't know how.
 
 ## Internal access to members
 
@@ -150,8 +158,7 @@ use friend classes for private access, but this causes problems to derived class
 and can't be a long term solution.
 
 I removed friend functions and restructured the code to provide nice class
-members. In addition I moved most native logic to native_wnd. Let's see if I can
-get everything there.
+members. 
 
 ## To Wayland or not to Wayland?
 

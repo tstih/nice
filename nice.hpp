@@ -135,45 +135,12 @@ namespace nice {
 
 
     // --- window base ----------------------------------------------
-    class native_wnd {
-    public:
-        native_wnd() : hwnd(0) {}
-    protected:
-        // Native window handle.
-        HWND hwnd;
-
-        // Member callback, must implement!
-        virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2) = 0;
-
-        // Generic callback. Calls member callback.
-        static LRESULT CALLBACK global_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-        {
-            // Is it the very first message? Only on WM_NCCREATE.
-            // TODO: Why does Windows 10 send WM_GETMINMAXINFO first?!
-            native_wnd* self = nullptr;
-            if (message == WM_NCCREATE) {
-                LPCREATESTRUCT lpcs = reinterpret_cast<LPCREATESTRUCT>(lParam);
-                auto self = static_cast<native_wnd*>(lpcs->lpCreateParams);
-                self->hwnd = hWnd; // save the window handle too!
-                SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
-            }
-            else
-                self = reinterpret_cast<native_wnd*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
-
-            // Chain...
-            if (self != nullptr)
-                return (self->local_wnd_proc(message, wParam, lParam));
-            else
-                return ::DefWindowProc(hWnd, message, wParam, lParam);
-        }
-    };
-
     template<class T>
-    class wnd : public native_wnd
+    class wnd
     {
     public:
         // Ctor.
-        wnd() : native_wnd() {}
+        wnd() : hwnd(0) {}
 
         // Method(s)
         virtual T* create() = 0;
@@ -196,55 +163,92 @@ namespace nice {
 
         // Events.
         signal<> created;        // Window created.
-        signal<> destroyed;        // Window destroyed.
+        signal<> destroyed;      // Window destroyed.
         signal<std::shared_ptr<artist>> paint;
 
     protected:
         // Overrides
-        virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2);
+        //virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2);
 
         // Properties.
         std::string text_;
+
+        // Native window handle.
+        HWND hwnd;
+
+        // Generic callback. Calls member callback.
+        static LRESULT CALLBACK global_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+        {
+            // Is it the very first message? Only on WM_NCCREATE.
+            // TODO: Why does Windows 10 send WM_GETMINMAXINFO first?!
+            wnd* self = nullptr;
+            if (message == WM_NCCREATE) {
+                LPCREATESTRUCT lpcs = reinterpret_cast<LPCREATESTRUCT>(lParam);
+                auto self = static_cast<wnd*>(lpcs->lpCreateParams);
+                self->hwnd = hWnd; // save the window handle too!
+                SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+            }
+            else
+                self = reinterpret_cast<wnd*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+            // Chain...
+            if (self != nullptr)
+                return (self->local_wnd_proc(message, wParam, lParam));
+            else
+                return ::DefWindowProc(hWnd, message, wParam, lParam);
+        }
+
+        // Local callback. Specific to wnd.
+        virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2) {
+            switch (id)
+            {
+            case WM_CREATE:
+                created.emit();
+                break;
+
+            case WM_DESTROY:
+                destroyed.emit();
+                break;
+
+            case WM_PAINT:
+            {
+                PAINTSTRUCT ps;
+                HDC hdc = BeginPaint(this->id(), &ps);
+                paint.emit(std::make_shared<artist>(hdc));
+                EndPaint(this->id(), &ps);
+            }
+            break;
+
+            default:
+                return ::DefWindowProc(this->id(), id, p1, p2);
+            }
+            return 0;
+        }
     };
-
-    
-    template<class T>
-    result wnd<T>::local_wnd_proc(msg_id id, par1 p1, par2 p2) {
-        switch (id)
-        {
-        case WM_CREATE:
-            created.emit();
-            break;
-
-        case WM_DESTROY:
-            destroyed.emit();
-            PostQuitMessage(0);
-            break;
-
-        case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(this->id(), &ps);
-            paint.emit(std::make_shared<artist>(hdc));
-            EndPaint(this->id(), &ps);
-        }
-        break;
-
-        default:
-            return ::DefWindowProc(this->id(), id, p1, p2);
-        }
-        return 0;
-    }
 
     // --- application window ---------------------------------------
     class app_wnd : public wnd<app_wnd>
     {
     public:
-        app_wnd(std::string text) : wnd() { text_ = text; class_ = "APP_WND"; }
-        virtual ~app_wnd() { }
-        
-        app_wnd* create();
-        void destroy();
+        app_wnd(std::string text) : wnd() { 
+            text_ = text; 
+            class_ = "APP_WND"; 
+        }
+        ~app_wnd() { destroy(); }
+
+        virtual app_wnd* create();
+        virtual void destroy();
+
+    protected:
+        virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2) {
+            // Forward the message down the chain.
+            auto r = wnd<app_wnd>::local_wnd_proc(id, p1, p2);
+            // If message is quit then post quit message...
+            if (id == WM_DESTROY)
+                ::PostQuitMessage(0);
+            // And return the result.
+            return r;
+        }
 
     private:
         std::string class_;
@@ -255,12 +259,14 @@ namespace nice {
     // --- button ---------------------------------------------------
     class button : public wnd<button> {
     public:
-        button(wnd_id parent, std::string text, rct r) : wnd(), parent_(parent) { text_ = text; class_ = "BUTTON"; r_ = r; }
-        button* create();
-        void destroy();
+        button(wnd_id parent, std::string text, rct r) : wnd(), parent_(parent) { text_ = text; r_ = r; }
+        ~button() { destroy(); }
+
+        virtual button* create();
+        virtual void destroy();
+
     protected:
         wnd_id parent_;
-        std::string class_;
         rct r_;
     };
 
@@ -342,7 +348,7 @@ namespace nice {
 
         // Create it.
         hwnd = ::CreateWindow(
-            class_.data(),
+            _T("BUTTON"),
             text_.data(),
             WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
             r_.x,

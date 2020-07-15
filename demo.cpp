@@ -19,7 +19,7 @@ private:
         // Create child controls.
         ok = std::unique_ptr<button>(
             ::create<button>(id(), "OK", rct{ 100,100,196,126 })
-            ->text("CLOSE")
+            ->text("CLOSE") // Test fluent interface. Change button text from OK to CLOSE.
             );
     }
 
