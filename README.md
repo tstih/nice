@@ -4,33 +4,7 @@ Nice is a modern C++ library for building graphical user interfaces.
 > This is an experimental development; unstable, and poorly documented. 
 > It will live up to expectations. Just not now. Thank you for your patience.
 
-# The Story
-
-It started as an excercise in modern C++ to refresh my skills. 
-
-The philosophy of nice is to:
- * hide native API complexities and expose nice C++17 interface: hence the name
- * enable creating derived classes on top of existing classes
- * use single header
- * be multiplatform
- * use fluent interface
-
-First naive version for Microsoft Windows featured a lot of friend functions,
-a simple standard map to redirect window messages (from window procedures to 
-member functions), and a lot of shared_ptrs.
-
-After initial refactoring friend functions were replaced by static member 
-functions, and the map mechanism with storing window class in window structure.
-
-I recently upgraded the code to respect some MS Windows design fundamentals, such as 
-that CreateWindow function sends and posts messages to window before the
-CreateWindow or CreateWindowEx function even returns window handle. 
-I remodelled the message chain according to these two sources:
- * https://docs.microsoft.com/en-us/windows/win32/learnwin32/managing-application-state-
- * https://devblogs.microsoft.com/oldnewthing/20191014-00/?p=102992
-
-In addition to that I created a pattern for two phase initialization of window
-classes, and introduced fluent interface.
+# Hello Nice
 
 Here's the Hello World application in nice:
 ~~~
@@ -90,6 +64,34 @@ void program()
     );
 }
 ~~~
+
+# The Story
+
+It started as an excercise in modern C++ to refresh my skills. 
+
+The philosophy of nice is to:
+ * hide native API complexities and expose nice C++17 interface: hence the name
+ * enable creating derived classes on top of existing classes
+ * use single header
+ * be multiplatform
+ * use fluent interface
+
+First naive version for Microsoft Windows featured a lot of friend functions,
+a simple standard map to redirect window messages (from window procedures to 
+member functions), and a lot of shared_ptrs.
+
+After initial refactoring friend functions were replaced by static member 
+functions, and the map mechanism with storing window class in window structure.
+
+I recently upgraded the code to respect some MS Windows design fundamentals, such as 
+that CreateWindow function sends and posts messages to window before the
+CreateWindow or CreateWindowEx function even returns window handle. 
+I remodelled the message chain according to these two sources:
+ * https://docs.microsoft.com/en-us/windows/win32/learnwin32/managing-application-state-
+ * https://devblogs.microsoft.com/oldnewthing/20191014-00/?p=102992
+
+In addition to that I created a pattern for two phase initialization of window
+classes, and introduced fluent interface.
 
 # Compiling
 
