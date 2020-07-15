@@ -10,6 +10,15 @@
 // Main entry point. You must provide this.
 extern void program();
 
+// --- two phase construction pattern -------------------------------
+template <class T, typename... A>
+static T* create(A... args)
+{
+    T* ptr = new T(args...);
+    ptr->create();
+    return ptr;
+}
+
 // --- signals ------------------------------------------------------
 namespace nice {
 template <typename... Args>
@@ -61,12 +70,6 @@ private:
 
 
 // --- forward declarations -----------------------------------------
-extern LRESULT CALLBACK WndProc(
-    HWND hWnd, 
-    UINT message, 
-    WPARAM wParam, 
-    LPARAM lParam);
-
 extern int WINAPI WinMain(
     _In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
@@ -87,28 +90,24 @@ namespace nice {
 
 
     // --- primitive structures -------------------------------------
-    class rct {
-    public:
+    struct rct {
         union { coord left; coord x; coord x1; };
         union { coord top; coord y;  coord y1; };
         union { coord right; coord x2; };
         union { coord bottom; coord y2; };
     };
 
-    class pt {
-    public:
+    struct pt {
         union { coord left; coord x; };
         union { coord top; coord y; };
     };
 
-    class size {
-    public:
+    struct size {
         union { coord width; coord w; };
         union { coord height; coord h; };
     };
 
-    class color {
-    public:
+    struct color {
         byte r;
         byte g;
         byte b;
@@ -118,105 +117,101 @@ namespace nice {
     // --- painter --------------------------------------------------
     class artist {
     public:
+        artist(HDC hdc) {
+            hdc_ = hdc;
+        }
+
+        // Method(s).
         void draw_rect(color c, const rct& r) {
             RECT rect = { r.left, r.top, r.right, r.bottom};
             HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
-            FrameRect(hdc_, &rect, brush);
+            ::FrameRect(hdc_, &rect, brush);
             ::DeleteObject(brush);
         }
 
-
     private:
         HDC hdc_; // Windows device context;
-
-        friend class wnd;
-        friend class app_wnd;
     };
 
 
-
     // --- window base ----------------------------------------------
-    class wnd
+    class native_wnd {
+    public:
+        native_wnd() : hwnd(0) {}
+    protected:
+        // Native window handle.
+        HWND hwnd;
+
+        // Member callback, must implement!
+        virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2) = 0;
+
+        // Generic callback. Calls member callback.
+        static LRESULT CALLBACK global_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+        {
+            // Is it the very first message? Only on WM_NCCREATE.
+            // TODO: Why does Windows 10 send WM_GETMINMAXINFO first?!
+            native_wnd* self = nullptr;
+            if (message == WM_NCCREATE) {
+                LPCREATESTRUCT lpcs = reinterpret_cast<LPCREATESTRUCT>(lParam);
+                auto self = static_cast<native_wnd*>(lpcs->lpCreateParams);
+                self->hwnd = hWnd; // save the window handle too!
+                SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+            }
+            else
+                self = reinterpret_cast<native_wnd*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+            // Chain...
+            if (self != nullptr)
+                return (self->local_wnd_proc(message, wParam, lParam));
+            else
+                return ::DefWindowProc(hWnd, message, wParam, lParam);
+        }
+    };
+
+    template<class T>
+    class wnd : public native_wnd
     {
     public:
-        wnd();
-        virtual ~wnd();
+        // Ctor.
+        wnd() : native_wnd() {}
 
-        // Methods.
-        virtual void conjure() = 0;
+        // Method(s)
+        virtual T* create() = 0;
+        virtual void destroy() = 0;
 
         // Properties.
-        wnd_id id();
-        void text(std::string t);
-        std::string text();
+        virtual wnd_id id() { return hwnd; }
+        virtual T* id(wnd_id id) { hwnd = id;  return (T*)this; }
+
+        virtual T* text(std::string txt) {
+            ::SetWindowText(id(), txt.data());
+            return (T*)this;
+        }
+
+        virtual std::string text() {
+            TCHAR sz[1024];
+            GetWindowText(id(), sz, 1024);
+            return sz;
+        }
 
         // Events.
         signal<> created;        // Window created.
         signal<> destroyed;        // Window destroyed.
         signal<std::shared_ptr<artist>> paint;
+
     protected:
+        // Overrides
+        virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2);
+
         // Properties.
-        wnd_id id_;
         std::string text_;
-
-        // Map of all existing windows, used by WndProc to delegate messages.
-        static std::map<HWND, wnd*> wnd_map; // TODO: smart pointer logic
-
-        // Member callback.
-        virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2) = 0;
-
-        friend LRESULT CALLBACK ::WndProc(
-            HWND hWnd,
-            UINT message,
-            WPARAM wParam,
-            LPARAM lParam);
     };
 
-    wnd::wnd() : id_{ 0 } {}
-
-    wnd::~wnd() {}
-
-    wnd_id wnd::id() { return id_; }
-
-    void wnd::text(std::string t)
-    {
-        text_ = t;
-    }
-
-    std::map<HWND, wnd*> wnd::wnd_map;
-
-    // --- application window ---------------------------------------
-    class app_wnd : public wnd
-    {
-    public:
-        app_wnd(std::string text) : wnd() { text_ = text; class_ = "APP_WND"; }
-        virtual ~app_wnd() {}
-        void conjure();
-    protected:
-        result local_wnd_proc(msg_id id, par1 p1, par2 p2);
-    private:
-        std::string class_;
-        WNDCLASSEX wcex_;
-        // Window procedure is a friend function of wnd class.
-        friend LRESULT CALLBACK ::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-    };
-
-    result app_wnd::local_wnd_proc(msg_id id, par1 p1, par2 p2) {
+    
+    template<class T>
+    result wnd<T>::local_wnd_proc(msg_id id, par1 p1, par2 p2) {
         switch (id)
         {
-        case WM_ERASEBKGND:
-            break;
-        case WM_PAINT:
-            {
-            PAINTSTRUCT ps;
-            HDC hdc= BeginPaint(this->id(), &ps);
-            auto art = std::make_shared<artist>();
-            art->hdc_ = hdc;
-            paint.emit(art);
-            EndPaint(this->id(), &ps);
-            }
-            break;
-
         case WM_CREATE:
             created.emit();
             break;
@@ -226,11 +221,48 @@ namespace nice {
             PostQuitMessage(0);
             break;
 
+        case WM_PAINT:
+        {
+            PAINTSTRUCT ps;
+            HDC hdc = BeginPaint(this->id(), &ps);
+            paint.emit(std::make_shared<artist>(hdc));
+            EndPaint(this->id(), &ps);
+        }
+        break;
+
         default:
             return ::DefWindowProc(this->id(), id, p1, p2);
         }
         return 0;
     }
+
+    // --- application window ---------------------------------------
+    class app_wnd : public wnd<app_wnd>
+    {
+    public:
+        app_wnd(std::string text) : wnd() { text_ = text; class_ = "APP_WND"; }
+        virtual ~app_wnd() { }
+        
+        app_wnd* create();
+        void destroy();
+
+    private:
+        std::string class_;
+        WNDCLASSEX wcex_;
+    };
+
+
+    // --- button ---------------------------------------------------
+    class button : public wnd<button> {
+    public:
+        button(wnd_id parent, std::string text, rct r) : wnd(), parent_(parent) { text_ = text; class_ = "BUTTON"; r_ = r; }
+        button* create();
+        void destroy();
+    protected:
+        wnd_id parent_;
+        std::string class_;
+        rct r_;
+    };
 
 
     // --- application ----------------------------------------------
@@ -240,7 +272,7 @@ namespace nice {
         static app_id id();
         static void id(app_id id);
         static int ret_code();
-        static void run(std::shared_ptr<app_wnd> w);
+        static void run(std::unique_ptr<app_wnd> w);
 
     private:
         static app_id id_;
@@ -254,14 +286,10 @@ namespace nice {
     void app::id(app_id id) { app::id_ = id; }
     int app::ret_code() { return app::ret_code_; }
 
-    void app::run(std::shared_ptr<app_wnd> w) {
-
-        // Create window.
-        w->conjure();
+    void app::run(std::unique_ptr<app_wnd> w) {
 
         // Show and update main window.
         ::ShowWindow(w->id(), SW_SHOWNORMAL);
-        ::UpdateWindow(w->id());
 
         // Enter message loop.
         MSG msg;
@@ -277,19 +305,19 @@ namespace nice {
 
 
     // --- cross reference functions --------------------------------
-    void app_wnd::conjure() {
+    app_wnd* app_wnd::create() {
 
         // Register window.
-        ZeroMemory(&wcex_, sizeof(WNDCLASSEX));
+        ::ZeroMemory(&wcex_, sizeof(WNDCLASSEX));
         wcex_.cbSize = sizeof(WNDCLASSEX);
-        wcex_.lpfnWndProc = ::WndProc;
+        wcex_.lpfnWndProc = wnd::global_wnd_proc;
         wcex_.hInstance = app::id();
         wcex_.lpszClassName = class_.data();
 
         if (!::RegisterClassEx(&wcex_)) { } // TODO: exception.
 
         // Create it.
-        id_ = ::CreateWindowEx(
+        hwnd = ::CreateWindowEx(
             0,
             class_.data(),
             text_.data(),
@@ -299,12 +327,40 @@ namespace nice {
             NULL,
             NULL,
             app::id(),
-            NULL);
+            this);
 
-        if (!id_) { } // TODO: exception.
+        if (!hwnd) { } // TODO: exception.
 
-        // Add to list of windows.
-        wnd::wnd_map.insert(std::make_pair(id_, this));
+        return this;
+    }
+
+    void app_wnd::destroy() {
+        ::DestroyWindow(id());
+    }
+    
+    button* button::create() {
+
+        // Create it.
+        hwnd = ::CreateWindow(
+            class_.data(),
+            text_.data(),
+            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+            r_.x,
+            r_.y,
+            r_.x2 - r_.x1 + 1,
+            r_.y2 - r_.y1 + 1,
+            parent_,
+            NULL,
+            app::id(),
+            this);
+
+        if (!hwnd) {} // TODO: exception.
+
+        return this;
+    }
+
+    void button::destroy() {
+        ::DestroyWindow(id());
     }
 
 } // namespace nice
@@ -327,131 +383,7 @@ int WINAPI WinMain(
     return nice::app::ret_code();
 }
 
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    auto it = nice::wnd::wnd_map.find(hWnd);
-    if (it != nice::wnd::wnd_map.end())
-        return it->second->local_wnd_proc(message, wParam, lParam);
-    else
-        return ::DefWindowProc(hWnd, message, wParam, lParam);
-}
 
-#elif __linux__ // #ifdef _WIN32
-
-
-// --- includes -----------------------------------------------------
-#include <gtk/gtk.h>
-
-
-namespace nice {
-
-    // --- types ----------------------------------------------------
-    typedef GtkApplication* app_id;
-    typedef GtkWidget* wnd_id;
-
-
-    // --- window base ----------------------------------------------
-    class wnd
-    {
-    public:
-        wnd();
-        virtual ~wnd();
-
-        // Methods.
-        virtual void conjure() = 0;
-
-        // Properties.
-        wnd_id id();
-        void text(std::string t);
-        std::string text();
-
-    protected:
-        // Properties.
-        wnd_id id_;
-        std::string text_;
-    };
-
-    wnd::wnd() : id_{ 0 } {}
-
-    wnd::~wnd() {}
-
-    wnd_id wnd::id() { return id_; }
-
-    void wnd::text(std::string t)
-    {
-        text_ = t;
-    }
-
-
-    // --- application window ---------------------------------------
-    class app_wnd : public wnd
-    {
-    public:
-        app_wnd(std::string text) : wnd() { text_ = text; }
-        virtual ~app_wnd() {}
-    };
-
-
-    // --- application ----------------------------------------------
-    extern static void on_app_activate(GtkApplication *app, gpointer user_data)
-
-    class app
-    {
-    public:
-        static app_id id();
-        static void id(app_id id);
-        static int ret_code();
-        static void run(std::shared_ptr<app_wnd> w);
-
-    private:
-        static app_id id_;
-        static int ret_code_;
-    };
-
-    app_id app::id_{ 0 };
-    int app::ret_code_{ 0 };
-
-    app_id app::id() { return app::id_; }
-    void app::id(app_id id) { app::id_ = id; }
-    int app::ret_code() { return app::ret_code_; }
-
-    void app::run(std::shared_ptr<app_wnd> w) {
-        w->conjure();
-    }
-
-
-    // --- cross reference functions --------------------------------
-    void app_wnd::conjure() {
-        // Create window and set the id.
-        id(gtk_application_window_new (app::id()));
-          gtk_window_set_title (GTK_WINDOW (id()), text());
-          gtk_window_set_default_size (GTK_WINDOW (id()), 200, 200);
-          gtk_widget_show (id());
-    }
-}
-
-// --- startup code -------------------------------------------------
-static void on_app_activate(GtkApplication *app, gpointer user_data) {
-    program();
-}
-
-int main(int argc, char **argv) {
-    
-    // Set application id.
-    nice::app::id(gtk_application_new("nice.app", G_APPLICATION_FLAGS_NONE));
-
-    // Connect app. activation to on_app_activate.
-    g_signal_connect(app::id(), "activate", G_CALLBACK(on_app_activate), NULL);
-    auto status = g_application_run(G_APPLICATION(nice::app:id()), argc, argv);
-    g_object_unref(app::id());
-
-    // Finally, set the return code.
-    app::ret_code_ = status;
-
-    // And return it.
-    return nice::app::ret_code();
-}
-
-#endif // #elif __linux__
+#endif // #ifdef _WIN32
 
 #endif // #ifndef _NICE_HPP

@@ -10,9 +10,16 @@ Hello world in nice:
 
 void program()
 {
-    nice::app::run(std::make_shared<nice::app_wnd>("Hello world!"));
+    nice::app::run(app::run(
+        std::unique_ptr<app_wnd>(
+            ::create<app_wnd>("Hello world!")
+        )
+    );
 }
 ~~~
+
+Question? Why using shared pointer when I can use pass by value and
+move semantics?
 
 Hello paint in nice:
 ~~~
@@ -22,21 +29,36 @@ using namespace nice;
 
 class main_wnd : public app_wnd {
 public:
-    main_wnd() : app_wnd("Hello paint!") {
-        // Subscribe to event.
+    main_wnd() : app_wnd("Hello paint!"), ok(nullptr) {
+        
+        // Subscribe to events.
+        created.connect(this, &main_wnd::on_created);
         paint.connect(this, &main_wnd::on_paint);
+        
     }
 private:
-    void on_paint(std::shared_ptr<artist> a) const {
+
+    // OK button.
+    std::unique_ptr<button> ok;
+    void on_created() {
+        // Create child controls.
+        ok = std::unique_ptr<button>(
+            ::create<button>(id(), "OK", rct{ 100,100,196,126 })
+            ->text("CLOSE")
+            );
+    }
+
+    // Paint handler, draws rectangle.
+    void on_paint(std::shared_ptr<artist> a) {
         a->draw_rect({ 255,0,0 }, { 10,10,200,100 });
     }
 };
 
 void program()
 {
-    nice::app::run(
-        std::static_pointer_cast<nice::app_wnd>(
-            std::make_shared<main_wnd>()
+    app::run(
+        std::unique_ptr<main_wnd>(
+            ::create<main_wnd>()
         )
     );
 }
@@ -55,6 +77,8 @@ make
 
 ## Linux
 
+UPDATE: Linux support temporary removed. Coming back soon.
+
 nice depends on GTK3 library. Install it to your machine if
 not already installed.
 
@@ -66,6 +90,31 @@ Then do
 cmake .
 make
 ~~~
+
+# The Story
+
+It started as an excercise in modern C++. I needed a simple 
+library for programming Microsoft Windows desktop applications. 
+
+The philosophy of nice is to
+ * hide native complexity and expose nice C++0x interface, hence the name
+ * enable creating derived classes on top of existing classes
+ * use single header
+ * be multiplatform
+
+First naive version for Microsoft Windows featured a lot of friend functions to
+hide native implementation. A simple map structure was used to redirect window 
+messages from window procedures to member functions.
+
+After few refactoring phases, friend functions were replaced by
+static member function.
+
+Afterwards I hit some MS Windows design fundamentals, such as that
+CreateWindow function already sends and posts messages before window
+handle is even returned by the functions. So I remodelled the 
+message chain according to these two sources:
+ * https://docs.microsoft.com/en-us/windows/win32/learnwin32/managing-application-state-
+ * https://devblogs.microsoft.com/oldnewthing/20191014-00/?p=102992
 
 # Status
 
@@ -96,12 +145,22 @@ We are trying to hide platform specific class members. One way to do this is to
 use friend classes for private access, but this causes problems to derived classes
 and can't be a long term solution.
 
+UPDATE: I removed friend functions and restructured the code to provide nice class
+members.
+
 ## To Wayland or not to Wayland?
 
-Wayland is draw-only technology, no widgets. Would it be easier to implement on
-top of GTK instead? If not, I'll have to reimplement plenty. But, on the other side,
-I'll create library, capable of begin ported to embedded systems with only basic 2D
-drawing functions.
+Wayland is a technology for drawing things. It has no widgets. If ~nice~ is 
+implemented on top of Wayland, it will have to re-implement many features, 
+that are already part of toolkits, such as GTK+ or QT.
+
+On the other side, such library will be portable to embedded systems with 
+only basic 2D drawing functions.
+
+## Base window function
+
+Has two pure virtuals that prevent it to be passed to other funtions. 
+Remove the two pure virtuals and restructure code.
 
 # How to be nice
 
@@ -109,21 +168,22 @@ Nice builds around several idioms.
 
 ## Static application class
 
-Different environments have different start up functions. For example, MS Windows uses WinMain, but X Windows uses standard C/C++ main.
+Different environments have different start up functions. For example, 
+MS Windows uses WinMain, but X Windows uses standard C/C++ main.
 
-To unify start up procedure nice:
- * unifies application entry point, you must provide
-   function program().
- * declares a static application class which is populated
-   by the start up function.
+To unify start up procedure ~nice~:
+ * has standard application entry point. you must provide 
+   function ~program()~.
+ * declares a static application class which is populated by the start up 
+   function.
 
 ~~~
 class app
 {
 public:
-    static app_id id();
+    static app_id id() const;
     static void id(app_id id);
-    static int ret_code();
+    static int ret_code() const;
     static void run(std::shared_ptr<app_wnd> w);
 };
 ~~~
@@ -137,11 +197,14 @@ Each application has:
 
 ## Class properties
 
-For class properties a get and a set overloaded functions are created with the same name. The get function takes no arguments, and returns a value (of property type). And the set function has no return type, and accepts one argument (of property type). 
+For class properties a get and a set overloaded functions are created 
+with the same name. The get function takes no arguments, and returns a 
+value (of property type). And the set function has no return type, 
+and accepts one argument (of property type). 
 
 Property example:
 ~~~
-int width(); // Get.
+int width() const; // Get.
 void width(int value); // Set.
 ~~~
 
@@ -176,4 +239,26 @@ typedef LRESULT result;
 
 ## Fluent interface
 
-The problem of before window creation and after window creation functions...
+The two phase window creation process poses a challenge to the fluent interface.
+
+Imagine a situation where you set the title of a window to some value before 
+creating a window. The class must store this value and use it when creating a 
+window. But if a change is made after creating a window, window title must be updated.
+
+Hence in case of fluent interface the implementation of the setter function for the title 
+will behave differently depending on the call order. 
+
+Here's one way to handle it.
+
+~~~
+void wnd::text(std::string t)
+{
+    text_ = t;
+    if (id()) // if window exists
+        ::SetWindowText(id(), t.data());
+}
+~~~
+
+## Tips and tricks used
+
+Obtaining applicaiton instance ~(HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE)~
