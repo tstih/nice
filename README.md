@@ -1,16 +1,46 @@
 # Welcome to nice
-Nice is an experimental modern C++ library for building graphical user interfaces. 
+Nice is a modern C++ library for building graphical user interfaces. 
 
-> This is early development. Sometimes things don't compile and are documented poorly. 
-> nice will live up to expectations, just not now. Thank you for your patience.
+> This is an experimental development; unstable, and poorly documented. 
+> It will live up to expectations. Just not now. Thank you for your patience.
 
-Hello world in nice:
+# The Story
+
+It started as an excercise in modern C++ to refresh my skills. 
+
+The philosophy of nice is to:
+ * hide native API complexities and expose nice C++17 interface: hence the name
+ * enable creating derived classes on top of existing classes
+ * use single header
+ * be multiplatform
+ * use fluent interface
+
+First naive version for Microsoft Windows featured a lot of friend functions,
+a simple standard map to redirect window messages (from window procedures to 
+member functions), and a lot of shared_ptrs.
+
+After initial refactoring friend functions were replaced by static member 
+functions, and the map mechanism with storing window class in window structure.
+
+I recently upgraded the code to respect some MS Windows design fundamentals, such as 
+that CreateWindow function sends and posts messages to window before the
+CreateWindow or CreateWindowEx function even returns window handle. 
+I remodelled the message chain according to these two sources:
+ * https://docs.microsoft.com/en-us/windows/win32/learnwin32/managing-application-state-
+ * https://devblogs.microsoft.com/oldnewthing/20191014-00/?p=102992
+
+In addition to that I created a pattern for two phase initialization of window
+classes, and introduced fluent interface.
+
+Here's the Hello World application in nice:
 ~~~
 #include "nice.hpp"
 
+using namespace nice;
+
 void program()
 {
-    nice::app::run(app::run(
+    app::run(
         std::unique_ptr<app_wnd>(
             ::create<app_wnd>("Hello world!")
         )
@@ -18,10 +48,7 @@ void program()
 }
 ~~~
 
-Question? Why using shared pointer when I can use pass by value and
-move semantics?
-
-Hello paint in nice:
+And here's the Hello Paint application in nice:
 ~~~
 #include "nice.hpp"
 
@@ -77,7 +104,7 @@ make
 
 ## Linux
 
-UPDATE: Linux support temporary removed. Coming back soon.
+**UPDATE: Linux support temporary removed. Coming back soon.**
 
 nice depends on GTK3 library. Install it to your machine if
 not already installed.
@@ -91,31 +118,6 @@ cmake .
 make
 ~~~
 
-# The Story
-
-It started as an excercise in modern C++. I needed a simple 
-library for programming Microsoft Windows desktop applications. 
-
-The philosophy of nice is to
- * hide native complexity and expose nice C++0x interface, hence the name
- * enable creating derived classes on top of existing classes
- * use single header
- * be multiplatform
-
-First naive version for Microsoft Windows featured a lot of friend functions to
-hide native implementation. A simple map structure was used to redirect window 
-messages from window procedures to member functions.
-
-After few refactoring phases, friend functions were replaced by
-static member function.
-
-Afterwards I hit some MS Windows design fundamentals, such as that
-CreateWindow function already sends and posts messages before window
-handle is even returned by the functions. So I remodelled the 
-message chain according to these two sources:
- * https://docs.microsoft.com/en-us/windows/win32/learnwin32/managing-application-state-
- * https://devblogs.microsoft.com/oldnewthing/20191014-00/?p=102992
-
 # Status
 
 ## Done
@@ -125,17 +127,17 @@ message chain according to these two sources:
  * mapping window messages to C++ signals
  * basic paint proof of concept
  * abstracting drawing primitives
+ * standards for pointer use!
+ * fluent interface
+ * refactoring no 1
 
 ## Implementing
- * gtk+ binding
- * standards for pointer use!
+ * standard controls (buttons, scrollbars, text edit)
 
 ## Planning
- * refactoring no 1
  * exceptions
- * fluent interface
  * refactoring no 2
- * standard controls (buttons, scrollbars, text edit)
+ * gtk+ binding
 
 # Dilemmas
 
@@ -145,8 +147,9 @@ We are trying to hide platform specific class members. One way to do this is to
 use friend classes for private access, but this causes problems to derived classes
 and can't be a long term solution.
 
-UPDATE: I removed friend functions and restructured the code to provide nice class
-members.
+I removed friend functions and restructured the code to provide nice class
+members. In addition I moved most native logic to native_wnd. Let's see if I can
+get everything there.
 
 ## To Wayland or not to Wayland?
 
@@ -156,11 +159,6 @@ that are already part of toolkits, such as GTK+ or QT.
 
 On the other side, such library will be portable to embedded systems with 
 only basic 2D drawing functions.
-
-## Base window function
-
-Has two pure virtuals that prevent it to be passed to other funtions. 
-Remove the two pure virtuals and restructure code.
 
 # How to be nice
 
@@ -192,8 +190,6 @@ Each application has:
  * unique identifier id() 
  * return code ret_code(), and
  * a run function taking main window as the only argument.
-
-# Idioms
 
 ## Class properties
 
@@ -236,29 +232,3 @@ typedef LRESULT result;
 * size size
 * rct rectangle
 * pt point
-
-## Fluent interface
-
-The two phase window creation process poses a challenge to the fluent interface.
-
-Imagine a situation where you set the title of a window to some value before 
-creating a window. The class must store this value and use it when creating a 
-window. But if a change is made after creating a window, window title must be updated.
-
-Hence in case of fluent interface the implementation of the setter function for the title 
-will behave differently depending on the call order. 
-
-Here's one way to handle it.
-
-~~~
-void wnd::text(std::string t)
-{
-    text_ = t;
-    if (id()) // if window exists
-        ::SetWindowText(id(), t.data());
-}
-~~~
-
-## Tips and tricks used
-
-Obtaining applicaiton instance ~(HINSTANCE)GetWindowLongPtr(m_hwnd, GWLP_HINSTANCE)~
