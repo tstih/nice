@@ -10,55 +10,58 @@
 // Main entry point. You must provide this.
 extern void program();
 
-// --- two phase construction pattern -------------------------------
-template <class T, typename... A>
-static T* create(A... args)
-{
-    T* ptr = new T(args...);
-    ptr->create();
-    return ptr;
-}
 
-// --- signals ------------------------------------------------------
 namespace nice {
-template <typename... Args>
-class signal {
-public:
-    signal() : current_id_(0) {}
-    template <typename T> int connect(T* inst, void (T::* func)(Args...)) {
-        return connect([=](Args... args) {
-            (inst->*func)(args...);
-            });
+ 
+    // --- two phase construction pattern -------------------------------
+    template <class T, typename... A>
+    std::shared_ptr<T> create(A... args)
+    {
+        // Create a shared pointer with a custom deleter.
+        std::shared_ptr<T> ptr(new T(args...), [](T* p) { p->destroy();  delete p; });
+        ptr->create();
+        return ptr;
     }
 
-    template <typename T> int connect(T* inst, void (T::* func)(Args...) const) {
-        return connect([=](Args... args) {
-            (inst->*func)(args...);
-            });
-    }
-
-    int connect(std::function<void(Args...)> const& slot) const {
-        slots_.insert(std::make_pair(++current_id_, slot));
-        return current_id_;
-    }
-
-    void disconnect(int id) const {
-        slots_.erase(id);
-    }
-
-    void disconnect_all() const {
-        slots_.clear();
-    }
-
-    void emit(Args... p) {
-        for (auto const& it : slots_) {
-            it.second(std::forward<Args>(p)...);
+    // --- signals ------------------------------------------------------
+    template <typename... Args>
+    class signal {
+    public:
+        signal() : current_id_(0) {}
+        template <typename T> int connect(T* inst, void (T::* func)(Args...)) {
+            return connect([=](Args... args) {
+                (inst->*func)(args...);
+                });
         }
-    }
-private:
-    mutable std::map<int, std::function<void(Args...)>> slots_;
-    mutable int current_id_;
-};
+
+        template <typename T> int connect(T* inst, void (T::* func)(Args...) const) {
+            return connect([=](Args... args) {
+                (inst->*func)(args...);
+                });
+        }
+
+        int connect(std::function<void(Args...)> const& slot) const {
+            slots_.insert(std::make_pair(++current_id_, slot));
+            return current_id_;
+        }
+
+        void disconnect(int id) const {
+            slots_.erase(id);
+        }
+
+        void disconnect_all() const {
+            slots_.clear();
+        }
+
+        void emit(Args... p) {
+            for (auto const& it : slots_) {
+                it.second(std::forward<Args>(p)...);
+            }
+        }
+    private:
+        mutable std::map<int, std::function<void(Args...)>> slots_;
+        mutable int current_id_;
+    };
 } // using nice
 
 
@@ -133,26 +136,42 @@ namespace nice {
         HDC hdc_; // Windows device context;
     };
 
+    // --- layout manager -------------------------------------------
+    class layout {
+    public:
+        virtual void apply() {}
+    };
+
+    class no_layout : public layout {
+
+    };
 
     // --- window base ----------------------------------------------
-    template<class T>
-    class wnd
-    {
+    class native_wnd {
     public:
         // Ctor.
-        wnd() : hwnd(0) {}
+        native_wnd() : hwnd_(NULL) {}
 
-        // Method(s)
-        virtual T* create() = 0;
-        virtual void destroy() = 0;
+        // Window handle.
+        HWND hwnd_;
+    };
+
+    class wnd : public native_wnd
+    {
+    public:
+
+        // Ctor. Default is no layout manager!
+        wnd() : lm_(std::make_shared<no_layout>()) {}
+
+        virtual wnd* create()=0;
+        virtual void destroy()=0;
 
         // Properties.
-        virtual wnd_id id() { return hwnd; }
-        virtual T* id(wnd_id id) { hwnd = id;  return (T*)this; }
+        virtual wnd_id id() { return hwnd_; }
+        virtual void id(wnd_id id) { hwnd_ = id;  }
 
-        virtual T* text(std::string txt) {
+        virtual void text(std::string txt) {
             ::SetWindowText(id(), txt.data());
-            return (T*)this;
         }
 
         virtual std::string text() {
@@ -167,14 +186,12 @@ namespace nice {
         signal<std::shared_ptr<artist>> paint;
 
     protected:
-        // Overrides
-        //virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2);
+        
+        // Current layout manager.
+        std::shared_ptr<layout> lm_;
 
         // Properties.
         std::string text_;
-
-        // Native window handle.
-        HWND hwnd;
 
         // Generic callback. Calls member callback.
         static LRESULT CALLBACK global_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -185,7 +202,7 @@ namespace nice {
             if (message == WM_NCCREATE) {
                 LPCREATESTRUCT lpcs = reinterpret_cast<LPCREATESTRUCT>(lParam);
                 auto self = static_cast<wnd*>(lpcs->lpCreateParams);
-                self->hwnd = hWnd; // save the window handle too!
+                self->id(hWnd); // save the window handle too!
                 SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
             }
             else
@@ -219,6 +236,11 @@ namespace nice {
             }
             break;
 
+            case WM_SIZING:
+            case WM_SIZE:
+                if (lm_ != nullptr)
+                    lm_->apply();
+                // And fall through...
             default:
                 return ::DefWindowProc(this->id(), id, p1, p2);
             }
@@ -227,14 +249,13 @@ namespace nice {
     };
 
     // --- application window ---------------------------------------
-    class app_wnd : public wnd<app_wnd>
+    class app_wnd : public wnd
     {
     public:
         app_wnd(std::string text) : wnd() { 
             text_ = text; 
             class_ = "APP_WND"; 
         }
-        ~app_wnd() { destroy(); }
 
         virtual app_wnd* create();
         virtual void destroy();
@@ -242,7 +263,7 @@ namespace nice {
     protected:
         virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2) {
             // Forward the message down the chain.
-            auto r = wnd<app_wnd>::local_wnd_proc(id, p1, p2);
+            auto r = wnd::local_wnd_proc(id, p1, p2);
             // If message is quit then post quit message...
             if (id == WM_DESTROY)
                 ::PostQuitMessage(0);
@@ -257,16 +278,14 @@ namespace nice {
 
 
     // --- button ---------------------------------------------------
-    class button : public wnd<button> {
+    class button : public wnd {
     public:
-        button(wnd_id parent, std::string text, rct r) : wnd(), parent_(parent) { text_ = text; r_ = r; }
-        ~button() { destroy(); }
+        button(std::string text, rct r) : wnd() { text_ = text; r_ = r; }
 
         virtual button* create();
         virtual void destroy();
 
     protected:
-        wnd_id parent_;
         rct r_;
     };
 
@@ -278,7 +297,7 @@ namespace nice {
         static app_id id();
         static void id(app_id id);
         static int ret_code();
-        static void run(std::unique_ptr<app_wnd> w);
+        static void run(std::shared_ptr<app_wnd> w);
 
     private:
         static app_id id_;
@@ -292,10 +311,10 @@ namespace nice {
     void app::id(app_id id) { app::id_ = id; }
     int app::ret_code() { return app::ret_code_; }
 
-    void app::run(std::unique_ptr<app_wnd> w) {
+    void app::run(std::shared_ptr<app_wnd> w) {
 
         // Show and update main window.
-        ::ShowWindow(w->id(), SW_SHOWNORMAL);
+        ::ShowWindow(w->hwnd_, SW_SHOWNORMAL);
 
         // Enter message loop.
         MSG msg;
@@ -323,7 +342,7 @@ namespace nice {
         if (!::RegisterClassEx(&wcex_)) { } // TODO: exception.
 
         // Create it.
-        hwnd = ::CreateWindowEx(
+        hwnd_ = ::CreateWindowEx(
             0,
             class_.data(),
             text_.data(),
@@ -335,7 +354,7 @@ namespace nice {
             app::id(),
             this);
 
-        if (!hwnd) { } // TODO: exception.
+        if (!hwnd_) { } // TODO: exception.
 
         return this;
     }
@@ -347,7 +366,7 @@ namespace nice {
     button* button::create() {
 
         // Create it.
-        hwnd = ::CreateWindow(
+        hwnd_ = ::CreateWindow(
             _T("BUTTON"),
             text_.data(),
             WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
@@ -355,12 +374,12 @@ namespace nice {
             r_.y,
             r_.x2 - r_.x1 + 1,
             r_.y2 - r_.y1 + 1,
-            parent_,
+            NULL, // No parent?
             NULL,
             app::id(),
             this);
 
-        if (!hwnd) {} // TODO: exception.
+        if (!hwnd_) {} // TODO: exception.
 
         return this;
     }

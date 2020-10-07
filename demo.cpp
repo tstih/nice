@@ -9,18 +9,14 @@ public:
         // Subscribe to events.
         created.connect(this, &main_wnd::on_created);
         paint.connect(this, &main_wnd::on_paint);
-        
     }
 private:
 
     // OK button.
-    std::unique_ptr<button> ok;
+    std::shared_ptr<button> ok;
     void on_created() {
         // Create child controls.
-        ok = std::unique_ptr<button>(
-            ::create<button>(id(), "OK", rct{ 100,100,196,126 })
-            ->text("CLOSE") // Test fluent interface. Change button text from OK to CLOSE.
-            );
+        ok = ::create<button>("OK", rct{ 100,100,196,126 });
     }
 
     // Paint handler, draws rectangle.
@@ -31,9 +27,5 @@ private:
 
 void program()
 {
-    app::run(
-        std::unique_ptr<main_wnd>(
-            ::create<main_wnd>()
-        )
-    );
+    app::run(::create<main_wnd>());
 }
