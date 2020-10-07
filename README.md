@@ -114,7 +114,7 @@ Anything that supports two phase initialization must implement
 `create()` and `destroy()` functions. You should implement acquiring 
 and releasing system resources in these two functions.
 
-Then use ~::create()~ global function to create these classes.
+Then use `::create()` global function to create these classes.
 
 ~~~
 auto ok = ::create<button>("OK", rct{ 100,100,196,126 });
@@ -184,9 +184,9 @@ the map mechanism with storing window class in window structure.
 Different environments have different start up functions. For example, 
 MS Windows uses WinMain, but X Windows uses standard C/C++ main.
 
-To unify start up procedure ~nice~:
+To unify start up procedure `nice`:
  * has standard application entry point. you must provide 
-   function ~program()~.
+   function `program()`.
  * declares a static application class which is populated by the start up 
    function.
 
