@@ -49,7 +49,8 @@ private:
 void program()
 {
     app::run(::create<main_wnd>());
-}~~~
+}
+~~~
 
 
 # Compiling
