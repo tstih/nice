@@ -100,8 +100,15 @@ Nice builds around several idioms.
 
 ## Using shared pointers for windows
 
-What we do here is [against the rules of passing smart pointers](https://www.modernescpp.com/index.php/c-core-guidelines-passing-smart-pointer)
-but it works well for us. We use `std::shared_ptr` for window resources. 
+[Against the rules of passing smart pointers]
+(https://www.modernescpp.com/index.php/c-core-guidelines-passing-smart-pointer)
+we use `std::shared_ptr` for all window resources. 
+
+The prevailing argument for this decisions is their uniform handling. 
+Sure, sometimes it would make more sense to use `std::unique_ptr`. 
+But having all our functions accept the same data structure makes 
+it easier to allocate and pass around. There's no need for annoying casts 
+and the resource usage is safe.
 
 ## Two phase initialization
 

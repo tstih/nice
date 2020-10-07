@@ -6,6 +6,8 @@
 #include <memory>
 #include <string>
 #include <iterator>
+#include <type_traits>
+#include <concepts>
 
 // Main entry point. You must provide this.
 extern void program();
@@ -14,14 +16,35 @@ extern void program();
 namespace nice {
  
     // --- two phase construction pattern -------------------------------
-    template <class T, typename... A>
-    std::shared_ptr<T> create(A... args)
+
+    // The resource (that requires two phase construction).
+    template <typename T>
+    class resource {
+    public:
+        virtual T* create() = 0;
+        virtual void destroy() = 0;
+    };
+
+    // Concept.
+    template <typename T>
+    concept TP = requires(T t) { 
+        
+        { t.create() }; // TODO: Use A... and check return type.
+        { t.destroy() };      
+    };
+
+    // The global create function.
+    // TODO: Add concept/constraint to limit T to nice::resource derivates.
+    template <TP T, typename... A>
+    std::shared_ptr<T> create(A... args) //requires two_phase<T>
     {
+        //static_assert(two_phase<T*>, "create and destroy function(s) required to use ::create");
         // Create a shared pointer with a custom deleter.
         std::shared_ptr<T> ptr(new T(args...), [](T* p) { p->destroy();  delete p; });
         ptr->create();
         return ptr;
     }
+
 
     // --- signals ------------------------------------------------------
     template <typename... Args>
@@ -156,15 +179,12 @@ namespace nice {
         HWND hwnd_;
     };
 
-    class wnd : public native_wnd
+    class wnd : public native_wnd, resource<wnd>
     {
     public:
 
         // Ctor. Default is no layout manager!
         wnd() : lm_(std::make_shared<no_layout>()) {}
-
-        virtual wnd* create()=0;
-        virtual void destroy()=0;
 
         // Properties.
         virtual wnd_id id() { return hwnd_; }
