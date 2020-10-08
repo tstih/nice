@@ -6,15 +6,33 @@
 #include <memory>
 #include <string>
 #include <iterator>
-#include <type_traits>
-#include <concepts>
 
 // Main entry point. You must provide this.
 extern void program();
 
 
 namespace nice {
- 
+
+
+    // --- nice exceptions ----------------------------------------------
+    #define throw_ex(ex, what) \
+        throw ex(what, __FILE__,__FUNCTION__,__LINE__);
+
+    class nice_exception : public std::exception {
+    public:
+        nice_exception(
+            std::string what, 
+            std::string file=nullptr, 
+            std::string func=nullptr, 
+            int line=0) : what_(what), file_(file), func_(func), line_(line) {};
+        std::string what() { return what_; }
+    protected:
+        std::string what_;
+        std::string file_; // __FILE__
+        std::string func_; // __FUNCTION__
+        int line_; // __LINE__
+    };
+
     // --- two phase construction pattern -------------------------------
 
     // The resource (that requires two phase construction).
@@ -22,7 +40,7 @@ namespace nice {
     class resource {
     public:
         virtual void create() = 0;
-        virtual void destroy() = 0;
+        virtual void destroy() noexcept = 0; // Can happen in an exception!
     };
 
     // Concept.
@@ -34,11 +52,9 @@ namespace nice {
     };
 
     // The global create function.
-    // TODO: Add concept/constraint to limit T to nice::resource derivates.
     template <TP T, typename... A>
-    std::shared_ptr<T> create(A... args) //requires two_phase<T>
+    std::shared_ptr<T> create(A... args) requires TP<T>
     {
-        //static_assert(two_phase<T*>, "create and destroy function(s) required to use ::create");
         // Create a shared pointer with a custom deleter.
         std::shared_ptr<T> ptr(new T(args...), [](T* p) { p->destroy();  delete p; });
         ptr->create();
@@ -278,7 +294,7 @@ namespace nice {
         }
 
         virtual void create();
-        virtual void destroy();
+        virtual void destroy() noexcept;
 
         void add(std::shared_ptr<wnd> child) {
             ::SetParent(child->id(), id());
@@ -307,7 +323,7 @@ namespace nice {
         button(std::string text, rct r) : wnd() { text_ = text; r_ = r; }
 
         virtual void create();
-        virtual void destroy();
+        virtual void destroy() noexcept;
 
     protected:
         rct r_;
@@ -320,7 +336,7 @@ namespace nice {
         text_edit(rct r) : wnd(), r_(r) {}
 
         virtual void create();
-        virtual void destroy();
+        virtual void destroy() noexcept;
 
     protected:
         rct r_;
@@ -376,7 +392,7 @@ namespace nice {
         wcex_.hInstance = app::id();
         wcex_.lpszClassName = class_.data();
 
-        if (!::RegisterClassEx(&wcex_)) { } // TODO: exception.
+        if (!::RegisterClassEx(&wcex_)) throw_ex(nice_exception, "Unable to register application window.");
 
         // Create it.
         hwnd_ = ::CreateWindowEx(
@@ -391,10 +407,11 @@ namespace nice {
             app::id(),
             this);
 
-        if (!hwnd_) { } // TODO: exception.
+        if (!hwnd_)
+            throw_ex(nice_exception, "Unable to create application window.");
     }
 
-    void app_wnd::destroy() {
+    void app_wnd::destroy() noexcept {
         ::DestroyWindow(id());
     }
     
@@ -414,10 +431,11 @@ namespace nice {
             app::id(),
             this);
 
-        if (!hwnd_) {} // TODO: exception.
+        if (!hwnd_)
+            throw_ex(nice_exception, "Unable to create button.");
     }
 
-    void button::destroy() {
+    void button::destroy() noexcept {
         ::DestroyWindow(id());
     }
 
@@ -437,10 +455,11 @@ namespace nice {
             app::id(),
             this);
 
-        if (!hwnd_) {} // TODO: exception.
+        if (!hwnd_)
+            throw_ex(nice_exception, "Unable to create text edit control.");
     }
 
-    void text_edit::destroy() {
+    void text_edit::destroy() noexcept {
         ::DestroyWindow(id());
     }
 } // namespace nice

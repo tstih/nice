@@ -81,9 +81,9 @@ Coming soon.
  * standards for pointer use!
  * refactoring no 1
  * standard controls POC (button, text edit)
+ * exceptions
 
 ## Implementing
- * exceptions
  * basic layout manager POC
  * refactoring no 2
 
@@ -155,6 +155,12 @@ Property example:
 int width() const; // Get.
 void width(int value); // Set.
 ~~~
+
+## Exceptions
+
+Throw `nice_exception` using the `throw_ex` macro. This macro expands to
+include `__FILE__`, `__FUNCTION__`, and `__LINE__` into the exception when c
+compiled with `_DEBUG` flag.
 
 # Bumps on the road
 
