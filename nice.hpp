@@ -21,7 +21,7 @@ namespace nice {
     template <typename T>
     class resource {
     public:
-        virtual T* create() = 0;
+        virtual void create() = 0;
         virtual void destroy() = 0;
     };
 
@@ -29,7 +29,7 @@ namespace nice {
     template <typename T>
     concept TP = requires(T t) { 
         
-        { t.create() }; // TODO: Use A... and check return type.
+        { t.create() };
         { t.destroy() };      
     };
 
@@ -277,8 +277,12 @@ namespace nice {
             class_ = "APP_WND"; 
         }
 
-        virtual app_wnd* create();
+        virtual void create();
         virtual void destroy();
+
+        void add(std::shared_ptr<wnd> child) {
+            ::SetParent(child->id(), id());
+        }
 
     protected:
         virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2) {
@@ -302,7 +306,20 @@ namespace nice {
     public:
         button(std::string text, rct r) : wnd() { text_ = text; r_ = r; }
 
-        virtual button* create();
+        virtual void create();
+        virtual void destroy();
+
+    protected:
+        rct r_;
+    };
+
+
+    // --- text edit ------------------------------------------------
+    class text_edit : public wnd {
+    public:
+        text_edit(rct r) : wnd(), r_(r) {}
+
+        virtual void create();
         virtual void destroy();
 
     protected:
@@ -350,7 +367,7 @@ namespace nice {
 
 
     // --- cross reference functions --------------------------------
-    app_wnd* app_wnd::create() {
+    void app_wnd::create() {
 
         // Register window.
         ::ZeroMemory(&wcex_, sizeof(WNDCLASSEX));
@@ -375,15 +392,13 @@ namespace nice {
             this);
 
         if (!hwnd_) { } // TODO: exception.
-
-        return this;
     }
 
     void app_wnd::destroy() {
         ::DestroyWindow(id());
     }
     
-    button* button::create() {
+    void button::create() {
 
         // Create it.
         hwnd_ = ::CreateWindow(
@@ -394,20 +409,40 @@ namespace nice {
             r_.y,
             r_.x2 - r_.x1 + 1,
             r_.y2 - r_.y1 + 1,
-            NULL, // No parent?
+            HWND_MESSAGE, // Start as message only window.
             NULL,
             app::id(),
             this);
 
         if (!hwnd_) {} // TODO: exception.
-
-        return this;
     }
 
     void button::destroy() {
         ::DestroyWindow(id());
     }
 
+    void text_edit::create() {
+
+        // Create it.
+        hwnd_ = ::CreateWindow(
+            _T("EDIT"),
+            text_.data(),
+            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+            r_.x,
+            r_.y,
+            r_.x2 - r_.x1 + 1,
+            r_.y2 - r_.y1 + 1,
+            HWND_MESSAGE, // Start as message only window.
+            NULL,
+            app::id(),
+            this);
+
+        if (!hwnd_) {} // TODO: exception.
+    }
+
+    void text_edit::destroy() {
+        ::DestroyWindow(id());
+    }
 } // namespace nice
 
 

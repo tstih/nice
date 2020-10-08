@@ -80,18 +80,21 @@ Coming soon.
  * abstracting drawing primitives
  * standards for pointer use!
  * refactoring no 1
+ * standard controls POC (button, text edit)
 
 ## Implementing
- * standard controls (button, text edit, etc.)
+ * exceptions
+ * basic layout manager POC
+ * refactoring no 2
 
 ## Planning
- * exceptions
- * basic layout manager
- * refactoring no 2
- * gtk+ binding
  * custom controls
+ * scribble app
+ * calculator app
+ * paint app
  * refactoring no 3
  * multithreading operations
+ * gtk+ binding
 
 
 # How to be nice
@@ -247,6 +250,18 @@ typedef BYTE byte;
 * pt point
 * color rgba color structure
 
+
+## Window hierarchy
+
+All windows are derived from `wnd`. This one, itself, is derived from
+`native_wnd`. Parent windows (main_wnd, dialog_wnd) are derived from `parent_wnd`,
+and child windows (button, text_edit, label) are derived from `child_wnd`.
+
+### Adding child windows
+
+All child windows are intially created as message only windows. When added
+to the parent by calling `add(std::shared_ptr<child_wnd> child)` windows are
+reparented.
 
 # Links
 

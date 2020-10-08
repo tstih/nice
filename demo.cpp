@@ -14,9 +14,17 @@ private:
 
     // OK button.
     std::shared_ptr<button> ok;
+    std::shared_ptr<text_edit> name;
     void on_created() {
+
+
         // Create child controls.
-        ok = ::create<button>("OK", rct{ 100,100,196,126 });
+        name = ::create<text_edit>(rct{ 50,120,200,146 });
+        ok = ::create<button>("OK", rct{ 100,150,196,176 });
+
+        // And reparent.
+        add(name);
+        add(ok);
     }
 
     // Paint handler, draws rectangle.
