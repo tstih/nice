@@ -82,6 +82,7 @@ Coming soon.
  * refactoring no 1
  * standard controls POC (button, text edit)
  * exceptions
+ * fonts poc
 
 ## Implementing
  * basic layout manager POC
@@ -269,6 +270,7 @@ All child windows are intially created as message only windows. When added
 to the parent by calling `add(std::shared_ptr<child_wnd> child)` windows are
 reparented.
 
+
 # Links
 
 Following were particularly useful when developing nice.
@@ -276,3 +278,35 @@ Following were particularly useful when developing nice.
 How to handle windows state.
  * https://docs.microsoft.com/en-us/windows/win32/learnwin32/managing-application-state-
  * https://devblogs.microsoft.com/oldnewthing/20191014-00/?p=102992
+
+Windows Fonts
+ * http://winprog.org/tutorial/fonts.html
+
+User defined literals
+ * https://akrzemi1.wordpress.com/2012/08/12/user-defined-literals-part-i/
+
+
+ # Notes
+
+## Layout manager
+
+Each `parent_wnd` has a `layout_manager` i.e. a default absolute positioning
+layout manager. This manager listens to window resize events, and detects 
+adding and removing child controls. It then relayouts all child controls.
+
+Derived layout managers use different logic to relayout child controls.
+
+How to handle various parameters for different layout managers (i.e. row and
+column for grid layout manager, coords. for default layout manager)? Easy,
+by separating placeholder and control. You create a placeholder 1 in layout and
+add control to it. Placeholder has all special settings, not the control.
+
+There has to be a "next placeholder" setting (default setting) for automatic
+layout managers.
+
+What about nesting layout managers?
+
+## Fonts
+
+Using C++11 literas for em, px, and other units would be interesting.
+Font size would be written as 10_px or 1.5_em.

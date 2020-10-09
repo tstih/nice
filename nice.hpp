@@ -109,6 +109,7 @@ namespace nice {
 // --- includes -----------------------------------------------------
 #include <windows.h>
 #include <tchar.h>
+#include <strsafe.h>
 
 
 // --- forward declarations -----------------------------------------
@@ -129,6 +130,7 @@ namespace nice {
     typedef LRESULT result;
     typedef LONG coord; 
     typedef BYTE byte;
+    typedef HGDIOBJ art_id;
 
 
     // --- primitive structures -------------------------------------
@@ -156,6 +158,53 @@ namespace nice {
         byte a;
     };
 
+    enum class font_weight {
+        thin = 100,
+        extralight=200,
+        light=300,
+        normal=400,
+        medium=500,
+        semibold=600,
+        bold=700,
+        extrabold=800,
+        heavy=900
+    };
+
+    // --- font -----------------------------------------------------
+    class font : resource<font> {
+    public:
+        font(std::string name, int px, font_weight weight=font_weight::normal
+        ) : hfont_(nullptr) {
+            ::ZeroMemory(&lf_, sizeof(LOGFONT));
+            lf_.lfHeight = px2screen(px);
+            lf_.lfWeight = static_cast<LONG>(weight);
+            ::StringCchCopy(lf_.lfFaceName, 32, name.data());
+        }
+        
+        virtual void create() {
+            hfont_ = ::CreateFontIndirect(&lf_);
+        }
+
+        virtual void destroy() noexcept {
+            ::DeleteObject(hfont_);
+        }
+    
+        art_id id() {
+            return hfont_;
+        }
+
+    protected:
+        HFONT hfont_;
+        LOGFONT lf_;
+
+        int px2screen(int px) {
+            auto hdc = ::GetDC(NULL);
+            int h = -::MulDiv(px, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+            ::ReleaseDC(NULL, hdc);
+            return h;
+        }
+    };
+
     // --- painter --------------------------------------------------
     class artist {
     public:
@@ -169,6 +218,13 @@ namespace nice {
             HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
             ::FrameRect(hdc_, &rect, brush);
             ::DeleteObject(brush);
+        }
+
+        void draw_text(std::shared_ptr<font> f, pt pt, std::string text) {
+            RECT r{pt.x,pt.y,pt.x+100,pt.y+50};
+            auto prev_font=::SelectObject(hdc_, f->id());
+            ::DrawText(hdc_, text.data(), text.length(), &r , DT_SINGLELINE);
+            ::SelectObject(hdc_, prev_font);
         }
 
     private:
