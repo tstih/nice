@@ -108,6 +108,7 @@ namespace nice {
 
 // --- includes -----------------------------------------------------
 #include <windows.h>
+#include <windowsx.h>
 #include <tchar.h>
 #include <strsafe.h>
 
@@ -170,10 +171,59 @@ namespace nice {
         heavy=900
     };
 
+    // --- non functional message structures ------------------------
+    struct mouse_info {
+    public:
+        mouse_info(pt pt, bool lbutton=false, bool mbutton=false, bool rbutton=false, bool ctrl_down=false, bool shift_down=false) {
+            location = pt;
+            left_button = lbutton;
+            middle_button = mbutton;
+            right_button = rbutton;
+            ctrl = ctrl_down;
+            shift = shift_down;
+        }
+        pt location;
+        bool left_button;
+        bool middle_button;
+        bool right_button;
+        bool ctrl;
+        bool shift;
+    };
+
+    // --- quantities -----------------------------------------------
+    class percent
+    {
+        double percent_;
+
+    public:
+        class pc {}; 
+        explicit constexpr percent(pc, double dpc) : percent_ { dpc } {}
+    };
+
+    constexpr percent operator "" _pc(long double dpc)
+    {
+        return percent{ percent::pc{}, static_cast<double>(dpc) };
+    }
+
+    class pixel
+    {
+        int pixel_;
+
+    public:
+        class px {};
+        explicit constexpr pixel(px, int ipx) : pixel_{ ipx } {}
+        int value() { return pixel_; }
+    };
+
+    constexpr pixel operator "" _px(unsigned long long ipx)
+    {
+        return pixel { pixel::px{}, static_cast<int>(ipx) };
+    }
+
     // --- font -----------------------------------------------------
     class font : resource<font> {
     public:
-        font(std::string name, int px, font_weight weight=font_weight::normal
+        font(std::string name, pixel px, font_weight weight=font_weight::normal
         ) : hfont_(nullptr) {
             ::ZeroMemory(&lf_, sizeof(LOGFONT));
             lf_.lfHeight = px2screen(px);
@@ -197,9 +247,9 @@ namespace nice {
         HFONT hfont_;
         LOGFONT lf_;
 
-        int px2screen(int px) {
+        int px2screen(pixel px) {
             auto hdc = ::GetDC(NULL);
-            int h = -::MulDiv(px, GetDeviceCaps(hdc, LOGPIXELSY), 72);
+            int h = -::MulDiv(px.value(), GetDeviceCaps(hdc, LOGPIXELSY), 72);
             ::ReleaseDC(NULL, hdc);
             return h;
         }
@@ -235,10 +285,8 @@ namespace nice {
     class layout {
     public:
         virtual void apply() {}
-    };
-
-    class no_layout : public layout {
-
+        layout& operator << (layout& child) {
+        }
     };
 
     // --- window base ----------------------------------------------
@@ -256,7 +304,8 @@ namespace nice {
     public:
 
         // Ctor. Default is no layout manager!
-        wnd() : lm_(std::make_shared<no_layout>()) {}
+        wnd() {
+        }
 
         // Properties.
         virtual wnd_id id() { return hwnd_; }
@@ -272,15 +321,18 @@ namespace nice {
             return sz;
         }
 
+        // Current layout manager.
+        layout children;
+
         // Events.
         signal<> created;        // Window created.
         signal<> destroyed;      // Window destroyed.
         signal<std::shared_ptr<artist>> paint;
+        signal<std::shared_ptr<mouse_info>> mouse_move;
+        signal<std::shared_ptr<mouse_info>> mouse_down;
+        signal<std::shared_ptr<mouse_info>> mouse_up;
 
     protected:
-        
-        // Current layout manager.
-        std::shared_ptr<layout> lm_;
 
         // Properties.
         std::string text_;
@@ -328,17 +380,22 @@ namespace nice {
             }
             break;
 
+            case WM_MOUSEMOVE:
+                mouse_move.emit(std::make_shared<mouse_info>(pt { GET_X_LPARAM(p2), GET_Y_LPARAM(p2) }));
+                break;
+
             case WM_SIZING:
             case WM_SIZE:
-                if (lm_ != nullptr)
-                    lm_->apply();
+                children.apply();
                 // And fall through...
+
             default:
                 return ::DefWindowProc(this->id(), id, p1, p2);
             }
             return 0;
         }
     };
+
 
     // --- application window ---------------------------------------
     class app_wnd : public wnd
@@ -447,6 +504,7 @@ namespace nice {
         wcex_.lpfnWndProc = wnd::global_wnd_proc;
         wcex_.hInstance = app::id();
         wcex_.lpszClassName = class_.data();
+        wcex_.hCursor = ::LoadCursor(NULL, IDC_ARROW);
 
         if (!::RegisterClassEx(&wcex_)) throw_ex(nice_exception, "Unable to register application window.");
 
@@ -491,7 +549,7 @@ namespace nice {
             throw_ex(nice_exception, "Unable to create button.");
     }
 
-    void button::destroy() noexcept {
+    void button::destroy() noexcept { // TODO: Implement generic destroy() functions inside base class.
         ::DestroyWindow(id());
     }
 

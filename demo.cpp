@@ -18,14 +18,13 @@ private:
     std::shared_ptr<font> verdana10_;
 
     void on_created() {
-
-
+        
         // Create child controls.
         name_ = ::create<text_edit>(rct{ 50,120,200,146 });
         ok_ = ::create<button>("OK", rct{ 100,150,196,176 });
 
         // Create font.
-        verdana10_ = ::create<font>("Verdana",15);
+        verdana10_ = ::create<font>("Verdana",9_px);
 
         // And reparent.
         add(name_);

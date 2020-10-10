@@ -13,6 +13,9 @@ The philosophy of nice is to:
  * be multiplatform
  * support native C++ multithreading 
  * introduce layout managers
+ * superfast ... loads instantly!
+ * supersmall ... kilobytes, not megabytes!
+ * single exe
 
 
 # Hello nice
@@ -86,12 +89,12 @@ Coming soon.
 
 ## Implementing
  * basic layout manager POC
+ * scribble app
+ * calculator app
  * refactoring no 2
 
 ## Planning
  * custom controls
- * scribble app
- * calculator app
  * paint app
  * refactoring no 3
  * multithreading operations
@@ -286,7 +289,7 @@ User defined literals
  * https://akrzemi1.wordpress.com/2012/08/12/user-defined-literals-part-i/
 
 
- # Notes
+# Brainstorming
 
 ## Layout manager
 
@@ -310,3 +313,13 @@ What about nesting layout managers?
 
 Using C++11 literas for em, px, and other units would be interesting.
 Font size would be written as 10_px or 1.5_em.
+
+## Intellisense
+
+::create disables intellisense, and hides real error location. That's really bad!
+Got to do something about it.
+
+## Usage of shared_ptr
+
+Using shared_ptr causes a lot of troubles. One being inability to use operators
+in a clean manner. Why couldn't we simply pass windows by value / const reference.
