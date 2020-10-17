@@ -1,22 +1,22 @@
 # Welcome to nice
-Nice is a modern C++ library for building graphical user interfaces. 
+Nice is a modern C++ micro framework for building desktop applications
+that started as an excercise in modern C++ to refresh my skills. 
 
-> This is an experimental development; unstable, and poorly documented. 
+> It is an experimental development; unstable, and poorly documented. 
 > It will live up to expectations. Just not now. Thank you for your patience.
 
-It started as an excercise in modern C++ to refresh my skills. 
-
 The philosophy of nice is to:
- * hide native API complexities and expose nice C++17 interface: hence the name
+ * keep it simple; if it is not, refactor it until it is,
+ * make it micro; an individual must to be able to fully understand it,
+ * hide native API complexities and expose nice interfaces: hence the name
  * enable creating derived classes on top of existing classes
+ * use best of C++20
  * use single header
- * be multiplatform
  * support native C++ multithreading 
- * introduce layout managers
- * superfast ... loads instantly!
- * supersmall ... kilobytes, not megabytes!
+ * support modern layout managers
+ * superfast, and supersmall; load instantly and use kilobytes, not megabytes!
  * single exe
-
+ * be multiplatform.
 
 # Hello nice
 Here's the Hello World application in nice:
@@ -27,7 +27,7 @@ using namespace nice;
 
 void program()
 {
-    app::run(::create<app_wnd>("Hello world!"));
+    app::run(app_wnd("Hello World!"));
 }
 ~~~
 
@@ -44,17 +44,16 @@ public:
     }
 private:
     // Paint handler, draws rectangle.
-    void on_paint(std::shared_ptr<artist> a) {
-        a->draw_rect({ 255,0,0 }, { 10,10,200,100 });
+    void on_paint(const artist& a) {
+        a.draw_rect({ 255,0,0 }, { 10,10,200,100 });
     }
 };
 
 void program()
 {
-    app::run(::create<main_wnd>());
+    app::run(main_wnd());
 }
 ~~~
-
 
 # Compiling
 
@@ -86,17 +85,18 @@ Coming soon.
  * standard controls POC (button, text edit)
  * exceptions
  * fonts poc
+ * refactoring no 2 (remove shared_ptr overkills)
 
 ## Implementing
  * basic layout manager POC
  * scribble app
  * calculator app
- * refactoring no 2
+ * refactoring no 3
 
 ## Planning
  * custom controls
  * paint app
- * refactoring no 3
+ * refactoring no 4
  * multithreading operations
  * gtk+ binding
 
@@ -105,47 +105,13 @@ Coming soon.
 
 Nice builds around several idioms. 
 
-## Using shared pointers for windows
-
-[Against the rules of passing smart pointers]
-(https://www.modernescpp.com/index.php/c-core-guidelines-passing-smart-pointer)
-we use `std::shared_ptr` for all window resources. 
-
-The prevailing argument for this decisions is their uniform handling. 
-Sure, sometimes it would make more sense to use `std::unique_ptr`. 
-But having all our functions accept the same data structure makes 
-it easier to allocate and pass around. There's no need for annoying casts 
-and the resource usage is safe.
-
 ## Two phase initialization
 
 Most windows resources (handles, etc) are initially created as 
 C++ objects, and then a system resource is created and attached
-to them. This two phase initialization is implemeted using smart
-pointers with custom deleters.
-
-Anything that supports two phase initialization must implement
-`create()` and `destroy()` functions. You should implement acquiring 
-and releasing system resources in these two functions.
-
-Then use `::create()` global function to create these classes.
-
-~~~
-auto ok = ::create<button>("OK", rct{ 100,100,196,126 });
-~~~
-
-So how does this `::create()` work? Like this:
-
-~~~
-template <class T, typename... A>
-std::shared_ptr<T> create(A... args)
-{
-    // Create a shared pointer with a custom deleter.
-    std::shared_ptr<T> ptr(new T(args...), [](T* p) { p->destroy();  delete p; });
-    ptr->create();
-    return ptr;
-}
-~~~
+to them. This two phase initialization is implemeted using 
+a combination of a base class called `resource` and  
+lazy evaluation.
 
 ## Class properties
 
@@ -198,6 +164,52 @@ the map mechanism with storing window class in window structure.
 
 
 # How does it work?
+
+## How and when when is a window created?
+
+Window creation is a two stage process. In first stage a C++ object is created, 
+but it has no native window attached. In second stage a native window
+is created. Second stage is only called when the native window is needed for
+the first time.
+
+To implement this each `wnd` is derived from `native_wnd`. Native window is a structure 
+that encapsulates basic Win32 API calls and structures. It window exposes native window
+handle as a property named `id()`. When you try to access this property for the first time, 
+the native window is created by calling the `create()` pure virtual function. By 
+overriding this function a custom creation code can be provided for the inherited class.
+
+~~~
+typedef HWND wnd_id;
+...
+class native_wnd {
+public:
+    // Ctor.
+    native_wnd() : hwnd_(NULL) {}
+    virtual ~native_wnd() { if (hwnd_ != NULL) destroy(); }
+
+    virtual wnd_id create() = 0;
+    virtual void destroy() {};
+
+    // Properties.
+    virtual wnd_id id() { 
+        if (hwnd_ == NULL)
+            hwnd_ = create();
+        return hwnd_; 
+    }
+    virtual void id(wnd_id id) { hwnd_ = id; }
+private:
+    // Window handle.
+    HWND hwnd_;
+};
+~~~
+
+Code fragment above shows main parts of native_wnd that collaborate to implement
+creation and destruction of window.
+
+> Propery `id()` hides native `hwnd_` handle. Only `native_wnd` can use the handle directly
+> to avoid unnecessary creation of window. All derived classes use the `id()` get accessor.
+
+TODO: But shouldn't you avoid calling virtual functions from destructors, even if virtual?
 
 ## Static application class
 
@@ -323,3 +335,13 @@ Got to do something about it.
 
 Using shared_ptr causes a lot of troubles. One being inability to use operators
 in a clean manner. Why couldn't we simply pass windows by value / const reference.
+
+## Plugins
+
+Should we include plugins into GUI library?
+
+http://www.cplusplus.com/articles/48TbqMoL/ 
+https://sourcey.com/articles/building-a-simple-cpp-cross-platform-plugin-system
+
+The answer seems to be: NO.
+

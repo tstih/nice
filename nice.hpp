@@ -13,7 +13,6 @@ extern void program();
 
 namespace nice {
 
-
     // --- nice exceptions ----------------------------------------------
     #define throw_ex(ex, what) \
         throw ex(what, __FILE__,__FUNCTION__,__LINE__);
@@ -39,28 +38,33 @@ namespace nice {
     template <typename T>
     class resource {
     public:
-        virtual void create() = 0;
-        virtual void destroy() noexcept = 0; // Can happen in an exception!
-    };
-
-    // Concept.
-    template <typename T>
-    concept TP = requires(T t) { 
         
-        { t.create() };
-        { t.destroy() };      
+        // Create and destroy patter for double phase construction.
+        virtual T create() = 0;
+        virtual void destroy() noexcept = 0; // Can happen in an exception!
+        
+        // Id setter.
+        virtual void id(T id) { id_ = id; }
+
+        // First access to id() creates the underlying native window,
+        // unless eval_only is set.
+        virtual T id(bool eval_only=false) const {
+            // Cheat c++ big time, just this once. Fake lazy_create() const.
+            if (!eval_only)
+                const_cast<resource<T>*>(this)->lazy_create();
+            // Return.
+            return id_;
+        }
+
+    private:
+        // Lazy evaluate resource.
+        void lazy_create() {
+            if (id_ == nullptr)
+                id(create());
+        }
+        // Store resource value here.
+        T id_{ nullptr };
     };
-
-    // The global create function.
-    template <TP T, typename... A>
-    std::shared_ptr<T> create(A... args) requires TP<T>
-    {
-        // Create a shared pointer with a custom deleter.
-        std::shared_ptr<T> ptr(new T(args...), [](T* p) { p->destroy();  delete p; });
-        ptr->create();
-        return ptr;
-    }
-
 
     // --- signals ------------------------------------------------------
     template <typename... Args>
@@ -221,30 +225,28 @@ namespace nice {
     }
 
     // --- font -----------------------------------------------------
-    class font : resource<font> {
+    class font : public resource<HFONT> {
     public:
         font(std::string name, pixel px, font_weight weight=font_weight::normal
-        ) : hfont_(nullptr) {
+        ) {
             ::ZeroMemory(&lf_, sizeof(LOGFONT));
             lf_.lfHeight = px2screen(px);
             lf_.lfWeight = static_cast<LONG>(weight);
             ::StringCchCopy(lf_.lfFaceName, 32, name.data());
         }
-        
-        virtual void create() {
-            hfont_ = ::CreateFontIndirect(&lf_);
+
+        virtual ~font() { destroy(); }
+
+        virtual HFONT create() {
+            return ::CreateFontIndirect(&lf_);
         }
 
         virtual void destroy() noexcept {
-            ::DeleteObject(hfont_);
+            ::DeleteObject(id(true));
+            id(nullptr);
         }
     
-        art_id id() {
-            return hfont_;
-        }
-
     protected:
-        HFONT hfont_;
         LOGFONT lf_;
 
         int px2screen(pixel px) {
@@ -263,16 +265,16 @@ namespace nice {
         }
 
         // Method(s).
-        void draw_rect(color c, const rct& r) {
+        void draw_rect(color c, rct r) const {
             RECT rect = { r.left, r.top, r.right, r.bottom};
             HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
             ::FrameRect(hdc_, &rect, brush);
             ::DeleteObject(brush);
         }
-
-        void draw_text(std::shared_ptr<font> f, pt pt, std::string text) {
+        
+        void draw_text(const font& f, pt pt, std::string text) const {
             RECT r{pt.x,pt.y,pt.x+100,pt.y+50};
-            auto prev_font=::SelectObject(hdc_, f->id());
+            auto prev_font=::SelectObject(hdc_, f.id());
             ::DrawText(hdc_, text.data(), text.length(), &r , DT_SINGLELINE);
             ::SelectObject(hdc_, prev_font);
         }
@@ -282,59 +284,65 @@ namespace nice {
     };
 
     // --- layout manager -------------------------------------------
-    class layout {
+    class wnd; 
+    class layout_pane {};
+    class layout_manager : layout_pane {
     public:
-        virtual void apply() {}
-        layout& operator << (layout& child) {
+        layout_manager& operator<<(layout_pane& pane)
+        {
+            panes_.push_back(&pane);
+            return *this;
         }
+        virtual void apply(const wnd& host, rct r) {}; // Apply layouting.
+    private:
+        std::vector<layout_pane*> panes_;
     };
 
-    // --- window base ----------------------------------------------
-    class native_wnd {
+    // --- native window --------------------------------------------
+    class native_wnd : public resource<HWND> {
     public:
         // Ctor.
-        native_wnd() : hwnd_(NULL) {}
+        native_wnd() {}
+        virtual ~native_wnd() { destroy(); }
 
-        // Window handle.
-        HWND hwnd_;
+        // Destroy should be the same for all native windows.
+        virtual void destroy() noexcept { ::DestroyWindow(id(true)); id(nullptr); }
     };
 
-    class wnd : public native_wnd, resource<wnd>
+    class wnd : public native_wnd, public layout_pane
     {
     public:
 
-        // Ctor. Default is no layout manager!
-        wnd() {
+        // Ctor.
+        wnd(std::string text = nullptr) { 
+            text_ = text; 
         }
 
-        // Properties.
-        virtual wnd_id id() { return hwnd_; }
-        virtual void id(wnd_id id) { hwnd_ = id;  }
-
+        // Window text.
         virtual void text(std::string txt) {
             ::SetWindowText(id(), txt.data());
         }
 
         virtual std::string text() {
             TCHAR sz[1024];
-            GetWindowText(id(), sz, 1024);
+            ::GetWindowText(id(), sz, 1024);
             return sz;
         }
 
-        // Current layout manager.
-        layout children;
+        layout_manager& host() { return host_; };
 
-        // Events.
-        signal<> created;        // Window created.
-        signal<> destroyed;      // Window destroyed.
-        signal<std::shared_ptr<artist>> paint;
-        signal<std::shared_ptr<mouse_info>> mouse_move;
-        signal<std::shared_ptr<mouse_info>> mouse_down;
-        signal<std::shared_ptr<mouse_info>> mouse_up;
+        // Events of basic window.
+        signal<> created;
+        signal<> destroyed;
+        signal<const artist&> paint;
+        signal<const mouse_info&> mouse_move;
+        signal<const mouse_info&> mouse_down;
+        signal<const mouse_info&> mouse_up;
 
     protected:
 
-        // Properties.
+        layout_manager host_;
+
         std::string text_;
 
         // Generic callback. Calls member callback.
@@ -375,18 +383,23 @@ namespace nice {
             {
                 PAINTSTRUCT ps;
                 HDC hdc = BeginPaint(this->id(), &ps);
-                paint.emit(std::make_shared<artist>(hdc));
+                artist a(hdc);
+                paint.emit(a);
                 EndPaint(this->id(), &ps);
             }
             break;
 
             case WM_MOUSEMOVE:
-                mouse_move.emit(std::make_shared<mouse_info>(pt { GET_X_LPARAM(p2), GET_Y_LPARAM(p2) }));
-                break;
+            {
+                mouse_info mi({ GET_X_LPARAM(p2), GET_Y_LPARAM(p2) });
+                mouse_move.emit(mi);
+            }
+            break;
 
             case WM_SIZING:
             case WM_SIZE:
-                children.apply();
+                // Apply default layout.
+                host().apply(*this, { 10,10,100,100 });
                 // And fall through...
 
             default:
@@ -401,17 +414,11 @@ namespace nice {
     class app_wnd : public wnd
     {
     public:
-        app_wnd(std::string text) : wnd() { 
-            text_ = text; 
+        app_wnd(std::string text) : wnd(text) { 
             class_ = "APP_WND"; 
         }
 
-        virtual void create();
-        virtual void destroy() noexcept;
-
-        void add(std::shared_ptr<wnd> child) {
-            ::SetParent(child->id(), id());
-        }
+        virtual wnd_id create();
 
     protected:
         virtual result local_wnd_proc(msg_id id, par1 p1, par2 p2) {
@@ -433,10 +440,9 @@ namespace nice {
     // --- button ---------------------------------------------------
     class button : public wnd {
     public:
-        button(std::string text, rct r) : wnd() { text_ = text; r_ = r; }
+        button(std::string text, rct r) : wnd(text) { r_ = r; }
 
-        virtual void create();
-        virtual void destroy() noexcept;
+        virtual wnd_id create();
 
     protected:
         rct r_;
@@ -446,10 +452,9 @@ namespace nice {
     // --- text edit ------------------------------------------------
     class text_edit : public wnd {
     public:
-        text_edit(rct r) : wnd(), r_(r) {}
+        text_edit(rct r) : wnd(""), r_(r) {}
 
-        virtual void create();
-        virtual void destroy() noexcept;
+        virtual wnd_id create();
 
     protected:
         rct r_;
@@ -463,7 +468,7 @@ namespace nice {
         static app_id id();
         static void id(app_id id);
         static int ret_code();
-        static void run(std::shared_ptr<app_wnd> w);
+        static void run(const app_wnd& w);
 
     private:
         static app_id id_;
@@ -477,10 +482,10 @@ namespace nice {
     void app::id(app_id id) { app::id_ = id; }
     int app::ret_code() { return app::ret_code_; }
 
-    void app::run(std::shared_ptr<app_wnd> w) {
+    void app::run(const app_wnd& w) {
 
         // Show and update main window.
-        ::ShowWindow(w->hwnd_, SW_SHOWNORMAL);
+        ::ShowWindow(w.id(), SW_SHOWNORMAL);
 
         // Enter message loop.
         MSG msg;
@@ -496,7 +501,21 @@ namespace nice {
 
 
     // --- cross reference functions --------------------------------
-    void app_wnd::create() {
+    /*
+    layout_manager::layout_manager(layout_pane* host) {
+        host_ = host;
+    }
+
+    layout_manager& layout_manager::operator << (std::shared_ptr<wnd> child) {
+        // Add to children.
+        ///children_.push_back(child.get());
+        // Find first window host.
+        
+//        ::SetParent(child->id(), host_->id());
+        return *this;
+    }*/
+
+    wnd_id app_wnd::create() {
 
         // Register window.
         ::ZeroMemory(&wcex_, sizeof(WNDCLASSEX));
@@ -509,7 +528,7 @@ namespace nice {
         if (!::RegisterClassEx(&wcex_)) throw_ex(nice_exception, "Unable to register application window.");
 
         // Create it.
-        hwnd_ = ::CreateWindowEx(
+        HWND hwnd = ::CreateWindowEx(
             0,
             class_.data(),
             text_.data(),
@@ -521,18 +540,16 @@ namespace nice {
             app::id(),
             this);
 
-        if (!hwnd_)
+        if (!hwnd)
             throw_ex(nice_exception, "Unable to create application window.");
-    }
 
-    void app_wnd::destroy() noexcept {
-        ::DestroyWindow(id());
+        return hwnd;
     }
     
-    void button::create() {
+    wnd_id button::create() {
 
         // Create it.
-        hwnd_ = ::CreateWindow(
+        HWND hwnd = ::CreateWindow(
             _T("BUTTON"),
             text_.data(),
             WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
@@ -545,18 +562,16 @@ namespace nice {
             app::id(),
             this);
 
-        if (!hwnd_)
+        if (!hwnd)
             throw_ex(nice_exception, "Unable to create button.");
+
+        return hwnd;
     }
 
-    void button::destroy() noexcept { // TODO: Implement generic destroy() functions inside base class.
-        ::DestroyWindow(id());
-    }
-
-    void text_edit::create() {
+    wnd_id text_edit::create() {
 
         // Create it.
-        hwnd_ = ::CreateWindow(
+        HWND hwnd = ::CreateWindow(
             _T("EDIT"),
             text_.data(),
             WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
@@ -569,12 +584,10 @@ namespace nice {
             app::id(),
             this);
 
-        if (!hwnd_)
+        if (!hwnd)
             throw_ex(nice_exception, "Unable to create text edit control.");
-    }
 
-    void text_edit::destroy() noexcept {
-        ::DestroyWindow(id());
+        return hwnd;
     }
 } // namespace nice
 
