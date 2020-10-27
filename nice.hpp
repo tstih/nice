@@ -10,8 +10,8 @@
 // Main entry point. You must provide this.
 extern void program();
 
-
 namespace nice {
+
 
     // --- nice exceptions ----------------------------------------------
     #define throw_ex(ex, what) \
@@ -32,9 +32,9 @@ namespace nice {
         int line_; // __LINE__
     };
 
-    // --- two phase construction pattern -------------------------------
 
-    // The resource (that requires two phase construction).
+
+    // --- two phase construction pattern -------------------------------
     template <typename T>
     class resource {
     public:
@@ -65,6 +65,8 @@ namespace nice {
         // Store resource value here.
         T id_{ nullptr };
     };
+
+
 
     // --- signals ------------------------------------------------------
     template <typename... Args>
@@ -105,6 +107,36 @@ namespace nice {
         mutable std::map<int, std::function<void(Args...)>> slots_;
         mutable int current_id_;
     };
+
+
+
+    // --- properties ------------------------------------------------------
+    template<typename T>
+    class property {
+    public:
+        property(
+            std::function<void(T)> setter,
+            std::function<T()> getter) :
+            setter_(setter), getter_(getter) { }
+        operator T() const { return getter_(); }
+        property<T>& operator= (const T& value) { setter_(value); return *this; }
+    private:
+        std::function<void(T)> setter_;
+        std::function<T()> getter_;
+    };
+
+    template<typename T>
+    class value_property : public property<T> {
+    public:
+        value_property(
+            std::function<void(T)> setter,
+            std::function<T()> getter) :
+            property(setter, getter) { }
+        T& value() { return value_; }
+    private:
+        T value_;
+    };
+
 } // using nice
 
 
@@ -125,7 +157,7 @@ extern int WINAPI WinMain(
     _In_ int nShowCmd);
 
 namespace nice {
-    
+
     // --- types ----------------------------------------------------
     typedef HINSTANCE app_id;
     typedef HWND wnd_id;
@@ -133,7 +165,7 @@ namespace nice {
     typedef WPARAM par1;
     typedef LPARAM par2;
     typedef LRESULT result;
-    typedef LONG coord; 
+    typedef LONG coord;
     typedef BYTE byte;
     typedef HGDIOBJ art_id;
 
@@ -144,6 +176,8 @@ namespace nice {
         union { coord top; coord y;  coord y1; };
         union { coord right; coord x2; };
         union { coord bottom; coord y2; };
+        coord width() { return x2 - x1 + 1; }
+        coord height() { return y2 - y1 + 1; }
     };
 
     struct pt {
@@ -165,20 +199,20 @@ namespace nice {
 
     enum class font_weight {
         thin = 100,
-        extralight=200,
-        light=300,
-        normal=400,
-        medium=500,
-        semibold=600,
-        bold=700,
-        extrabold=800,
-        heavy=900
+        extralight = 200,
+        light = 300,
+        normal = 400,
+        medium = 500,
+        semibold = 600,
+        bold = 700,
+        extrabold = 800,
+        heavy = 900
     };
 
     // --- non functional message structures ------------------------
     struct mouse_info {
     public:
-        mouse_info(pt pt, bool lbutton=false, bool mbutton=false, bool rbutton=false, bool ctrl_down=false, bool shift_down=false) {
+        mouse_info(pt pt, bool lbutton = false, bool mbutton = false, bool rbutton = false, bool ctrl_down = false, bool shift_down = false) {
             location = pt;
             left_button = lbutton;
             middle_button = mbutton;
@@ -200,8 +234,8 @@ namespace nice {
         double percent_;
 
     public:
-        class pc {}; 
-        explicit constexpr percent(pc, double dpc) : percent_ { dpc } {}
+        class pc {};
+        explicit constexpr percent(pc, double dpc) : percent_{ dpc } {}
     };
 
     constexpr percent operator "" _pc(long double dpc)
@@ -221,13 +255,13 @@ namespace nice {
 
     constexpr pixel operator "" _px(unsigned long long ipx)
     {
-        return pixel { pixel::px{}, static_cast<int>(ipx) };
+        return pixel{ pixel::px{}, static_cast<int>(ipx) };
     }
 
     // --- font -----------------------------------------------------
     class font : public resource<HFONT> {
     public:
-        font(std::string name, pixel px, font_weight weight=font_weight::normal
+        font(std::string name, pixel px, font_weight weight = font_weight::normal
         ) {
             ::ZeroMemory(&lf_, sizeof(LOGFONT));
             lf_.lfHeight = px2screen(px);
@@ -245,7 +279,7 @@ namespace nice {
             ::DeleteObject(id(true));
             id(nullptr);
         }
-    
+
     protected:
         LOGFONT lf_;
 
@@ -266,16 +300,16 @@ namespace nice {
 
         // Method(s).
         void draw_rect(color c, rct r) const {
-            RECT rect = { r.left, r.top, r.right, r.bottom};
+            RECT rect = { r.left, r.top, r.right, r.bottom };
             HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
             ::FrameRect(hdc_, &rect, brush);
             ::DeleteObject(brush);
         }
-        
+
         void draw_text(const font& f, pt pt, std::string text) const {
-            RECT r{pt.x,pt.y,pt.x+100,pt.y+50};
-            auto prev_font=::SelectObject(hdc_, f.id());
-            ::DrawText(hdc_, text.data(), text.length(), &r , DT_SINGLELINE);
+            RECT r{ pt.x,pt.y,pt.x + 100,pt.y + 50 };
+            auto prev_font = ::SelectObject(hdc_, f.id());
+            ::DrawText(hdc_, text.data(), text.length(), &r, DT_SINGLELINE);
             ::SelectObject(hdc_, prev_font);
         }
 
@@ -284,18 +318,34 @@ namespace nice {
     };
 
     // --- layout manager -------------------------------------------
-    class wnd; 
-    class layout_pane {};
-    class layout_manager : layout_pane {
+    class wnd;
+    // Basic layout manager maximizes each child.
+    struct pane {
     public:
-        layout_manager& operator<<(layout_pane& pane)
+        virtual void apply(rct r) {}; // Apply layouting.
+    };
+    struct composite_pane : public pane {
+    public:
+        composite_pane& composite_pane::operator<<(wnd& w);
+        virtual composite_pane& operator<<(pane p)
         {
-            panes_.push_back(&pane);
+            panes_.push_back(p);
             return *this;
         }
-        virtual void apply(const wnd& host, rct r) {}; // Apply layouting.
+        virtual void apply(rct r) { // Basic layout is max. each child
+            for (pane& p : panes_)
+                p.apply(r);
+        } 
+    protected:
+        std::vector<pane> panes_;
+    };
+    struct wnd_pane : public composite_pane {
+    public:
+        wnd_pane(wnd* host) : host_(host) {}
+        virtual wnd_pane& wnd_pane::operator<<(wnd& w);
+        void apply(rct r) override;
     private:
-        std::vector<layout_pane*> panes_;
+        wnd* host_;
     };
 
     // --- native window --------------------------------------------
@@ -309,7 +359,7 @@ namespace nice {
         virtual void destroy() noexcept { ::DestroyWindow(id(true)); id(nullptr); }
     };
 
-    class wnd : public native_wnd, public layout_pane
+    class wnd : public native_wnd
     {
     public:
 
@@ -329,7 +379,7 @@ namespace nice {
             return sz;
         }
 
-        layout_manager& host() { return host_; };
+        wnd_pane& layout_manager() { return layout_manager_; };
 
         // Events of basic window.
         signal<> created;
@@ -341,7 +391,7 @@ namespace nice {
 
     protected:
 
-        layout_manager host_;
+        wnd_pane layout_manager_{ this };
 
         std::string text_;
 
@@ -398,9 +448,13 @@ namespace nice {
 
             case WM_SIZING:
             case WM_SIZE:
+            {
+                RECT cr;
+                ::GetClientRect(this->id(), &cr);
                 // Apply default layout.
-                host().apply(*this, { 10,10,100,100 });
+                layout_manager().apply({ cr.left, cr.top, cr.right, cr.bottom });
                 // And fall through...
+            }
 
             default:
                 return ::DefWindowProc(this->id(), id, p1, p2);
@@ -500,20 +554,33 @@ namespace nice {
     }
 
 
+
     // --- cross reference functions --------------------------------
-    /*
-    layout_manager::layout_manager(layout_pane* host) {
-        host_ = host;
+    composite_pane& composite_pane::operator<<(wnd& w)
+    {
+        panes_.push_back(w.layout_manager());
+        return *this;
     }
 
-    layout_manager& layout_manager::operator << (std::shared_ptr<wnd> child) {
-        // Add to children.
-        ///children_.push_back(child.get());
-        // Find first window host.
-        
-//        ::SetParent(child->id(), host_->id());
+    wnd_pane& wnd_pane::operator<<(wnd& w)
+    {
+        // Add a child, if not already added.
+        if (::GetParent(w.id()) != host_->id())
+            ::SetParent(w.id(), host_->id());
+        panes_.push_back(w.layout_manager());
         return *this;
-    }*/
+    }
+
+    void wnd_pane::apply(rct r) {
+        // Check if position is already set?
+        RECT curr_pos;
+        ::GetClientRect(host_->id(), &curr_pos);
+        if (r.left!=curr_pos.left||r.right!=curr_pos.right||r.top!=curr_pos.top||r.bottom!=curr_pos.bottom)
+            ::MoveWindow(host_->id(), r.x, r.y, r.width(), r.height(), FALSE);
+
+        // And rewire to children...
+        composite_pane::apply(r);
+    }
 
     wnd_id app_wnd::create() {
 

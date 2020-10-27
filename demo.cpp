@@ -16,22 +16,8 @@ private:
     font verdana10_ { "Verdana", 9_px };
     
     void on_created() {
-        // Add controls to window.
-        
-        /*
-        
-        host()
-          << vert_layout_manager() ( // 5 rows.
-            << (horz_layout_manager() << alignment::center << display) // row 0 is display field
-            << (horz_layout_manager() << one << two << three) // row 1 are buttons one, two and three
-            << (horz_layout_manager() << four << five << six)
-            << (horz_layout_manager() << seven << eight << nine)
-            << (horz_layout_manager() << plus << zero << equals)
-        );
-        
-        */
-        
-        host() << ok_ << name_;
+        // Add both controls to window.
+        layout_manager() << ok_ << name_;
     }
 
     // Paint handler, draws rectangle.
