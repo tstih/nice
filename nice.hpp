@@ -147,7 +147,7 @@ namespace nice {
 #include <windowsx.h>
 #include <tchar.h>
 #include <strsafe.h>
-
+#include <dwmapi.h>
 
 // --- forward declarations -----------------------------------------
 extern int WINAPI WinMain(
@@ -469,7 +469,7 @@ namespace nice {
     {
     public:
         app_wnd(std::string text) : wnd(text) { 
-            class_ = "APP_WND"; 
+            class_ = "APP_WND";
         }
 
         virtual wnd_id create();
@@ -479,11 +479,31 @@ namespace nice {
             // Forward the message down the chain.
             auto r = wnd::local_wnd_proc(id, p1, p2);
             // If message is quit then post quit message...
-            if (id == WM_DESTROY)
+            if (id == WM_ACTIVATE) {
+                // Extend the frame into the client area.
+                MARGINS margins;
+
+                margins.cxLeftWidth = 0;      // 8
+                margins.cxRightWidth = 0;    // 8
+                margins.cyBottomHeight = 0; // 20
+                margins.cyTopHeight = 0;       // 27
+
+                auto hr = DwmExtendFrameIntoClientArea(this->id(), &margins);
+
+                if (!SUCCEEDED(hr))
+                {
+                    // Handle the error.
+                }
+
+                //fCallDWP = true;
+                //lRet = 0;
+            } else if (id == WM_DESTROY)
                 ::PostQuitMessage(0);
             // And return the result.
             return r;
         }
+
+
 
     private:
         std::string class_;

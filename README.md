@@ -380,6 +380,98 @@ property<int> age {
 int main() {
     person p;
     p.age=10; // Call setter.
-    std::cout<<p.age; // Call getter.
+    std::cout << p.age; // Call getter.
 }
 ~~~
+
+# Generic Layout Manager
+
+Our goal is a lightweight layout manager that can only do one thing: 
+layout its children. You populate the layout manager using the <<
+operator, and it can host child layout managers.
+
+Basic idea is
+
+~~~
+#include <vector>
+#include <iostream>
+
+struct rct {
+public:
+    int x,y,w,h;
+};
+
+struct layout_pane {
+public:
+    // Apply layout to child panes.
+    virtual void apply(rct r) {
+        std::cout << "layout_pane(" 
+            << r.x << "," << r.y << "," 
+            << r.w << "," << r.h
+            << ")"<< std::endl;
+        for (layout_pane& p : children_) 
+                p.apply(r); // Default layout maximizes children.
+    }
+    
+    virtual layout_pane& operator<<(const layout_pane& p) // Add child pane.
+    {
+        children_.push_back(p);
+        return *this;
+    }
+protected:
+    std::vector<layout_pane> children_; // Child panes.
+};
+
+// Structure children vertically,
+struct vertical_layout_pane : public layout_pane {
+public:
+    // Apply layout to child panes.
+    virtual void apply(rct r) override {
+        std::cout << "vertical_layout_pane("
+            << r.x << "," << r.y << "," 
+            << r.w << "," << r.h
+            << ")"<< std::endl;
+        auto n=children_.size();
+        if (n>0) {
+            int y=0, y_step=r.h/n;
+            for (layout_pane& p : children_) {
+                p.apply({r.x,y,r.w,y_step}); // Default layout maximizes children.
+                y+=y_step;
+            }
+        }
+    }
+};
+
+// Structure children horizontally.
+struct horizontal_layout_pane : public layout_pane {
+public:
+    // Apply layout to child panes.
+    virtual void apply(rct r) override {
+        std::cout << "horizontal_layout_pane(" 
+            << r.x << "," << r.y << "," 
+            << r.w << "," << r.h
+            << ")"<< std::endl;
+        auto n=children_.size();
+        if (n>0) {
+            int x=0, x_step=r.w/n;
+            for (layout_pane& p : children_) {
+                p.apply({x,r.y,x_step,r.h}); // Default layout maximizes children.
+                x+=x_step;
+            }
+        }
+    }
+};
+
+
+int main() {
+    auto l = vertical_layout_pane() << vertical_layout_pane(); // << horizontal_layout_pane() << layout_pane();
+        //<< ( horizontal_layout_pane() << layout_pane() )
+        //<< ( horizontal_layout_pane() << layout_pane() << layout_pane() );
+
+    l.apply({0,0,100,100});
+
+    return 0;
+}
+~~~ 
+
+This will create
