@@ -1,0 +1,8 @@
+﻿cmake_minimum_required (VERSION 3.8)
+project(nice)
+if (WIN32)
+    add_definitions(-DWIN32_LEAN_AND_MEAN)
+    add_executable (lesson1 WIN32 lesson1.cpp)
+    set_property(TARGET lesson1 PROPERTY CXX_STANDARD 20)
+elseif(UNIX)
+endif()

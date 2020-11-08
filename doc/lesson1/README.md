@@ -3,7 +3,7 @@
 When the operating system yields control to your application, 
 it executes some bootstrap code and then jumps to your applications' 
 entry point. In a traditional C/C++ application, this entry point 
-is a function called main().
+is a function called `main()`.
 
 Main accepts command line arguments, and returns an integer. 
 This integer is called the return code and is passed back
@@ -12,7 +12,7 @@ and any other value could indicate an error.
 
 Some operating systems don't follow this convention. For example, 
 MS Windows main entry point of a desktop application is a function
-called WinMain(). 
+called `WinMain()`. 
 
 Having different entry points on each platform would defeat our 
 purpose of being nice. So the first task of our framework is to
@@ -20,33 +20,47 @@ abstract the main function.
 
 ## Nice Application
 
-Lets start this process by declaring an standard entry point function called program()
+Lets start this process by declaring an standard entry point function called `program()`
 and a basic application class for storing command line arguments, and return code.
 
 ~~~cpp
-extern program()
+#include <string>
+#include <vector>
 
-class app
-    {
+extern void program();
+
+namespace nice {
+    typedef long app_id;
+
+    class app {
     public:
-        static int ret_code {0}; // Default is success.
-        std::vector<std::string> args;
+        static std::vector<std::string> args;
+        static int ret_code;
     };
+
+    int app::ret_code = 0; // Default return code.
+    std::vector<std::string> app::args;
+}
 ~~~
 
-Now we add the real main() function to our library header. Inside it, we 
-populate the app structure, and pass control to our program() function.
+Now we add the real `main()` function to our header file. Inside it, we 
+populate the app structure, and pass control to our `program()` function.
 
 ~~~cpp
+#if _WIN32 || WIN32
 int WINAPI WinMain(
     _In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
     _In_ LPSTR lpCmdLine,
     _In_ int nShowCmd)
 {
-    // Populate command line arguments.
-    args=std::vector<std::string>(__argv + 1, __argv + __argc);
-
+    nice::app::args=std::vector<std::string>(__argv + 1, __argv + __argc);
+#elif __unix__
+int main(int argc, char *argv[]) {
+    nice::app::args=std::vector<std::string>(argv + 1, argv + argc);
+#else
+#error "Only Windows and Linux supported."
+#endif
     // Run program.
     program();
 
@@ -54,6 +68,9 @@ int WINAPI WinMain(
     return nice::app::ret_code;
 }
 ~~~
+
+We adjusted our code to the environment by using preprocessor symbols
+_WIN32, WIN32, and __unix__. 
 
 ## Let's be a bit nicer
 
@@ -96,19 +113,22 @@ typedef pid_t app_id;
 Now we can add it to our app class, and populate it inside our real main function code.
 
 ~~~cpp
-class app
-{
+class app {
 public:
-    static int ret_code {0}; // Default is success.
-    std::vector<std::string> args;
-    app_id id();
-    bool is_already_running();
+    static std::vector<std::string> args;
+    static int ret_code;
+    static app_id id() { return id_; }
+    static bool is_already_running();
+
 private:
-    app_id id_;
+    static app_id id_;
 };
+
+int app::ret_code = 0;
+std::vector<std::string> app::args;
 ~~~
 
-## Time for you to be nice
+## Time to be nice
 
 # Copy'n' paste links
 
@@ -121,3 +141,57 @@ https://arstechnica.com/civis/viewtopic.php?t=42700
 
 ## Listing
 
+~~~cpp
+#include <string>
+#include <vector>
+
+extern void program();
+
+namespace nice {
+    typedef long app_id;
+
+    class app {
+    public:
+        // Cmd line arguments.
+        static std::vector<std::string> args;
+
+        // Return code.
+        static int ret_code;
+
+        // Process id.
+        static app_id id() { return id_; }
+
+        // Is another instance already running?
+        static bool is_already_running();
+
+    private:
+        static app_id id_;
+    };
+
+    int app::ret_code = 0;
+    std::vector<std::string> app::args;
+}
+
+#if _WIN32 || WIN32
+int WINAPI WinMain(
+    _In_ HINSTANCE hInstance,
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPSTR lpCmdLine,
+    _In_ int nShowCmd)
+{
+    nice::app::args=std::vector<std::string>(__argv + 1, __argv + __argc);
+#elif __unix__
+int main(int argc, char *argv[]) {
+    nice::app::args=std::vector<std::string>(argv + 1, argv + argc);
+#endif
+    // Run program.
+    program();
+
+    // And return return code;
+    return nice::app::ret_code;
+}
+
+void program() {
+    // Our code.
+}
+~~~
