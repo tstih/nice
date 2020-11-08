@@ -2,18 +2,16 @@ extern "C" {
 #if _WIN32
 #include <windows.h>
 #elif __unix__
-#include <sys/types.h>
+#include <sys/file.h>
 #include <unistd.h>
 #endif
 }
-#include <sstream>
-#include <string>
 #include <vector>
 #include <filesystem>
 
 extern void program();
 
-namespace nice {
+namespace ni {
 
 #if _WIN32
     typedef DWORD  app_id;
@@ -46,18 +44,32 @@ namespace nice {
 #if _WIN32
         return ::GetCurrentProcessId();
 #elif __unix__
-        return ::getpid(void);
+        return ::getpid();
 #endif
     }
-
     bool app::is_already_running() {
-        auto aname = std::filesystem::path(args[0]).stem();
+        std::string aname = std::filesystem::path(args[0]).stem();
         std::ostringstream name;
 #if _WIN32
         // Create local mutex.
         name << "Local\\" << aname;
         ::CreateMutex(0, FALSE, name.str().data());
         return (::GetLastError() == ERROR_ALREADY_EXISTS);
+#elif __unix__
+        // Pid file needs to go to /var/run
+        std::ostringstream pfname, pid;
+        pfname << "/tmp/" << aname << ".pid";
+        pid << ni::app::id() << std::endl;
+
+        // Open, lock, and forget. Let the OS close and unlock.
+        int pfd = ::open(pfname.str().data(), O_CREAT | O_RDWR, 0666);
+        int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
+        if (rc && EWOULDBLOCK == errno) return true;
+        else {
+            // Write our process id into the file.
+            ::write(pfd, pid.str().data(), pid.str().length());
+            return false;
+        }
 #endif
     }
 }
@@ -72,19 +84,21 @@ int WINAPI WinMain(
     // Store cmd line arguments to vector.
     int argc = __argc;
     char** argv = __argv;
-    nice::app::args = std::vector<std::string>(argv , argv + argc);
 #elif __unix__
 int main(int argc, char* argv[]) {
-    nice::app::args = std::vector<std::string>(argv, argv + argc);
 #endif
+    // Copy cmd line arguments to vector.
+    ni::app::args = std::vector<std::string>(argv, argv + argc);
+
     // Run program.
     program();
 
     // And return return code;
-    return nice::app::ret_code;
+    return ni::app::ret_code;
 }
 
-using namespace nice;
+using namespace ni;
 
 void program() {
+    // Your code here.
 }
