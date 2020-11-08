@@ -8,6 +8,7 @@ extern "C" {
 }
 #include <vector>
 #include <filesystem>
+#include <sstream>
 
 extern void program();
 
@@ -48,10 +49,10 @@ namespace ni {
 #endif
     }
     bool app::is_already_running() {
-        std::string aname = std::filesystem::path(args[0]).stem();
-        std::ostringstream name;
+        std::string aname = std::filesystem::path(args[0]).stem().string();
 #if _WIN32
         // Create local mutex.
+        std::ostringstream name;
         name << "Local\\" << aname;
         ::CreateMutex(0, FALSE, name.str().data());
         return (::GetLastError() == ERROR_ALREADY_EXISTS);
