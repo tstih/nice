@@ -45,8 +45,6 @@ and a basic application class for storing command line arguments, and return cod
 extern void program();
 
 namespace nice {
-    typedef long app_id;
-
     class app {
     public:
         static std::vector<std::string> args;
@@ -58,8 +56,9 @@ namespace nice {
 }
 ~~~
 
-Now let's add the real `main()` function to our header file, and inside it, 
-populate the app structure before passing control to our `program()` function.
+Now let's add the real `main()` function to our framework. Inside it we'll 
+first populate the app structure, and then pass control to our `program()` 
+function.
 
 ~~~cpp
 #if _WIN32
@@ -86,38 +85,35 @@ int main(int argc, char* argv[]) {
 }
 ~~~
 
-There's a lot going on here. First we separated the Windows and Linux
-implementation by using the preprocessor. We copied command line arguments
-to a vector args. We forwarded control to the `program()` function. And, finally,
-we used return code from the app class.
+What's going on here? First we separate Windows and Linux specific implementation 
+details by using the preprocessor. We copy command line arguments to a vector named
+`args`. And then we forward control to our `program()` function. Finally,
+we pick the `ret_code` from the app class, and use it as the application 
+return value.
+
+ > To change the return value, assign the new value to the `ni::app::ret_code` in your `program()` function.
 
 ## Evolving the app class
 
-In the code fragment above four parameters are passed to the WinMain function.
-And all four are ignored. Actually we implicitly use the lpCmdLine parameter, 
-which points to the raw command line arguments, with a little help of our friends 
-__argv and __argc, which point to the same content, but already processed for us. 
-It saves us some effort.
+In the code fragment above four parameters are passed to the `WinMain()` function.
+And all four are ignored. Actually we implicitly use the `lpCmdLine` parameter, 
+which points to the raw command line arguments. But we do it with a little help 
+of our friends the `__argv` and `__argc`, which point to classic C command line 
+arguments.
 
-One of cool features of Windows was providing os with an application instance and 
-previous instance. Converted to a parlance of the common folks, this was a simple 
-way to obtain unique process identifier, and check if application is already running. 
-But, unfortunately, that only worked in 16 bit version of Windows. Modern Windows
-always sets hPrevInstance to NULL, and hInstance to an internal memory address of the
-application which is not the same as process identifier. But never mind! They placed
-this ideas into our heads and now we mush have these features.
+One of the coolest features of Windows was providing our start up function with 
+the application handle of currently running application, and previous application handle
+if one was already running. This is what `hInstance`, and `hPrevInstance` were all about.
+They were giving us a unique application identifier and ability to check if an instance
+of this application is already running on a plate.
 
-On unix you obtain process id by calling the getpid(), and check if application is already 
-running by creating a temp file and locking it. if file is locked, application is 
-already running. And if the application crashes the file will be automatically 
-unlocked.
-
-On Windows you obtain process id with a system call GetCurrentProcessId(), and
-check . The hInstance of the exe can be obtained at any time by calling the
-GetModuleHandle(NULL) so we don't need to store it.
+Unfortunately, it only worked in 16 bit version of Windows. Modern Windows
+always sets `hPrevInstance` to NULL, and `hInstance` to an internal memory address of the
+application which is not the same as process identifier. But they did manage to place
+the need for this into our brains and now we mush have these features.
 
 To add these two features to the app class let us create an abstraction for the 
-application id.
+application id, and add new members to the app class.
 
 ~~~cpp
 #if _WIN32
@@ -125,17 +121,13 @@ application id.
 #elif __unix__ 
     typedef pid_t app_id;
 #endif
-~~~
 
-Now we can extedn our app class. We will add a function that 
-
-~~~cpp
 class app {
 public:
     static std::vector<std::string> args;
     static int ret_code;
-    static app_id id() { return id_; }
-    static bool is_already_running();
+    static app_id id() { return id_; } // Return unique process id.
+    static bool is_already_running();  // Is application already running?
 
 private:
     static app_id id_;
@@ -147,8 +139,8 @@ std::vector<std::string> app::args;
 
 ### Unique application id
 
-We use the process id as unique application id. Following function impelements
-querying the operating system for application id.
+On unix we can obtain process id by calling the `getpid()`, and on Windows we have
+the `GetCurrentProcessId()` function for that.
 
 ~~~cpp
 app_id app::id() {
@@ -162,11 +154,25 @@ app_id app::id() {
 
 ### Is application already running?
 
-This check is done with a named mutex object on Windows, and a pseudo pid file
-on Unix. For both platforms, the name is derived by stripping the first command line
-argument (the executable filename!) of its extension. Hence the application name for 
-`lesson1.exe` is `lesson1`, the named mutex name is `Local\lesson1`, and the 
-pid file is `/tmp/lesson1.pid`.
+The check if application is already running is quite different on Windows and on
+Unix. On the latter we create a file (if it doesn't exist) and try to lock it.
+If the lock is successfuly then we are the first instance. If lock fails another
+instance is running.
+
+On Unix the file is traditionally stored to /var/run and has an extension pid for
+system services, and to /tmp folder for applications. It's content is by convention
+a string value of process id that locked it. if the application crashes the file is 
+automatically unlocked by the operating system.
+
+On Windows we do this check by trying to obtain a named mutex object. If successful
+then we are the first instance. If not, someone already obtained the mutex.
+
+For both platforms, the application name is required. It is derived by stripping the 
+first command line argument (the executable filename!) of its extension. Hence the 
+application name for `lesson1.exe` is `lesson1`, the named mutex is `Local\lesson1`, 
+and the pid file is `/tmp/lesson1.pid`.
+
+Here's the code implementing this logic.
 
 ~~~cpp
 bool app::is_already_running() {
@@ -196,20 +202,18 @@ bool app::is_already_running() {
 }
 ~~~
 
-The reservation of resources - mutex creation and pid file creation and locking - is made 
+The reservation of resources - obtaining the mutex and locking the pid file - is made 
 inside the `is_already_running()` function, hence the first application to call this
-function is officially the first running applicaiton of its kind. Also, for simplicity 
-sake, we don't allow multiple calls to this function i.e. they all return false after
-the first call.
+function is officially the first running instance of its kind. For simplicity 
+sake, we don't allow multiple calls to this function i.e. subsequent calls all 
+return false.
 
 ## Conclusion
 
-This is it for the first lesson of the nice library. In this lesson you learned how nice
-is initialized, what the application class offers to you and how platform specific code is
-isolated.
+In this first lesson you learned how nice is initialized, what the application class offers 
+to you and how platform specific code is isolated.
 
-Next week we will write code for the base window class, and introduce a nice event handling 
-mechanism.
+Next week we will write about windows and event handling.
 
 ## Listing
 
