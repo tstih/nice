@@ -103,17 +103,17 @@ arguments.
 
 One of the coolest features of Windows was providing our start up function with 
 the application handle of currently running application, and previous application handle
-if one was already running. This is what `hInstance`, and `hPrevInstance` were all about.
+if one has already been running. This is what `hInstance`, and `hPrevInstance` were all about.
 They were giving us a unique application identifier and ability to check if an instance
-of this application is already running on a plate.
+of this application is already running, on a plate.
 
 Unfortunately, it only worked in 16 bit version of Windows. Modern Windows
 always sets `hPrevInstance` to NULL, and `hInstance` to an internal memory address of the
 application which is not the same as process identifier. But they did manage to place
-the need for this into our brains and now we mush have these features.
+the need for this into our brains and now our library must have these two features.
 
-To add these two features to the app class let us create an abstraction for the 
-application id, and add new members to the app class.
+To add them to the app class let us create an abstraction for the application id, and 
+add new members to the app class.
 
 ~~~cpp
 #if _WIN32
@@ -216,7 +216,7 @@ bool app::is_primary_instance() {
 The reservation of resources - obtaining the mutex and locking the pid file - is made 
 inside the `is_primary_instance()` function, hence the first application to call this
 function is officially the primary instance of its kind. For simplicity 
-sake, we add initial call to the `WinMain()` / `main()`.
+sake, we add initial call to this function into the `WinMain()` / `main()`.
 
 ## Conclusion
 
