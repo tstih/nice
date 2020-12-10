@@ -32,13 +32,15 @@ namespace ni {
         static app_id id();
 
         // Is another instance already running?
-        static bool is_already_running();
+        static bool is_primary_instance();
 
     private:
         static app_id id_;
+        static bool pinst_;
     };
 
     int app::ret_code = 0;
+    bool app::pinst_ = false;
     std::vector<std::string> app::args;
 
     app_id app::id() {
@@ -48,30 +50,35 @@ namespace ni {
         return ::getpid();
 #endif
     }
-    bool app::is_already_running() {
-        std::string aname = std::filesystem::path(args[0]).stem().string();
+    bool app::is_primary_instance() {
+        // Are we already primary instance? If not, try to become one.
+        if (!pinst_) {
+            std::string aname = std::filesystem::path(args[0]).stem().string();
 #if _WIN32
-        // Create local mutex.
-        std::ostringstream name;
-        name << "Local\\" << aname;
-        ::CreateMutex(0, FALSE, name.str().data());
-        return (::GetLastError() == ERROR_ALREADY_EXISTS);
+            // Create local mutex.
+            std::ostringstream name;
+            name << "Local\\" << aname;
+            ::CreateMutex(0, FALSE, name.str().data());
+            // We are primary instance.
+            pinst_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
 #elif __unix__
-        // Pid file needs to go to /var/run
-        std::ostringstream pfname, pid;
-        pfname << "/tmp/" << aname << ".pid";
-        pid << ni::app::id() << std::endl;
+            // Pid file needs to go to /var/run
+            std::ostringstream pfname, pid;
+            pfname << "/tmp/" << aname << ".pid";
+            pid << ni::app::id() << std::endl;
 
-        // Open, lock, and forget. Let the OS close and unlock.
-        int pfd = ::open(pfname.str().data(), O_CREAT | O_RDWR, 0666);
-        int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
-        if (rc && EWOULDBLOCK == errno) return true;
-        else {
-            // Write our process id into the file.
-            ::write(pfd, pid.str().data(), pid.str().length());
-            return false;
-        }
+            // Open, lock, and forget. Let the OS close and unlock.
+            int pfd = ::open(pfname.str().data(), O_CREAT | O_RDWR, 0666);
+            int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
+            pinst_ = !(rc && EWOULDBLOCK == errno);
+            if (pinst_) {
+                // Write our process id into the file.
+                ::write(pfd, pid.str().data(), pid.str().length());
+                return false;
+            }
 #endif
+        }
+        return pinst_;
     }
 }
 
@@ -88,8 +95,12 @@ int WINAPI WinMain(
 #elif __unix__
 int main(int argc, char* argv[]) {
 #endif
+
     // Copy cmd line arguments to vector.
     ni::app::args = std::vector<std::string>(argv, argv + argc);
+
+    // Try becoming primary instance...
+    ni::app::is_primary_instance();
 
     // Run program.
     program();
