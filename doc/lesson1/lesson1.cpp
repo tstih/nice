@@ -15,9 +15,9 @@ extern void program();
 namespace ni {
 
 #if _WIN32
-    typedef DWORD  app_id;
+    typedef DWORD  process_id;
 #elif __unix__ 
-    typedef pid_t app_id;
+    typedef pid_t process_id;
 #endif
 
     class app {
@@ -29,13 +29,12 @@ namespace ni {
         static int ret_code;
 
         // Process id.
-        static app_id id();
+        static process_id pid();
 
         // Is another instance already running?
         static bool is_primary_instance();
 
     private:
-        static app_id id_;
         static bool pinst_;
     };
 
@@ -43,7 +42,7 @@ namespace ni {
     bool app::pinst_ = false;
     std::vector<std::string> app::args;
 
-    app_id app::id() {
+    process_id app::pid() {
 #if _WIN32
         return ::GetCurrentProcessId();
 #elif __unix__
@@ -65,7 +64,7 @@ namespace ni {
             // Pid file needs to go to /var/run
             std::ostringstream pfname, pid;
             pfname << "/tmp/" << aname << ".pid";
-            pid << ni::app::id() << std::endl;
+            pid << ni::app::pid() << std::endl;
 
             // Open, lock, and forget. Let the OS close and unlock.
             int pfd = ::open(pfname.str().data(), O_CREAT | O_RDWR, 0666);

@@ -44,7 +44,7 @@ and a basic application class for storing command line arguments, and return cod
 
 extern void program();
 
-namespace nice {
+namespace ni {
     class app {
     public:
         static std::vector<std::string> args;
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
     ni::app::args = std::vector<std::string>(argv, argv + argc);
 
     // Run program.
-    program();
+    ::program();
 
     // And return return code;
     return ni::app::ret_code;
@@ -112,29 +112,28 @@ always sets `hPrevInstance` to NULL, and `hInstance` to an internal memory addre
 application which is not the same as process identifier. But they did manage to place
 the need for this into our brains and now our library must have these two features.
 
-To add them to the app class let us create an abstraction for the application id, and 
+To add them to the app class let us create an abstraction for the process id, and 
 add new members to the app class.
 
 ~~~cpp
 #if _WIN32
-    typedef DWORD  app_id;
+    typedef DWORD  process_id;
 #elif __unix__ 
-    typedef pid_t app_id;
+    typedef pid_t process_id;
 #endif
 
 class app {
 public:
     static std::vector<std::string> args;
     static int ret_code;
-    static app_id id() { return id_; } // Return unique process id.
+    static process_id pid(); // Return unique process id.
     static bool is_primary_instance();  // Is application already running?
 
 private:
-    static bool pinst_; // Are we the primary instance?
-    static app_id id_;
+    static bool primary_; // Are we the primary instance?
 };
 
-bool app::pinst_ = false;
+bool app::primary_ = false;
 int app::ret_code = 0;
 std::vector<std::string> app::args;
 ~~~
@@ -145,7 +144,7 @@ On unix we can obtain process id by calling the `getpid()`, and on Windows we ha
 the `GetCurrentProcessId()` function for that.
 
 ~~~cpp
-app_id app::id() {
+process_id app::pid() {
 #if _WIN32
     return ::GetCurrentProcessId();
 #elif __unix__
@@ -183,7 +182,7 @@ Here's the code implementing this logic.
 ~~~cpp
 bool app::is_primary_instance() {
     // Are we already primary instance? If not, try to become one.
-    if (!pinst_) {
+    if (!primary_) {
         std::string aname = std::filesystem::path(args[0]).stem().string();
 #if _WIN32
         // Create local mutex.
@@ -191,7 +190,7 @@ bool app::is_primary_instance() {
         name << "Local\\" << aname;
         ::CreateMutex(0, FALSE, name.str().data());
         // We are primary instance.
-        pinst_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
+        primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
 #elif __unix__
         // Pid file needs to go to /var/run
         std::ostringstream pfname, pid;
@@ -201,15 +200,15 @@ bool app::is_primary_instance() {
         // Open, lock, and forget. Let the OS close and unlock.
         int pfd = ::open(pfname.str().data(), O_CREAT | O_RDWR, 0666);
         int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
-        pinst_ = !(rc && EWOULDBLOCK == errno);
-        if (pinst_) {
+        primary_ = !(rc && EWOULDBLOCK == errno);
+        if (primary_) {
             // Write our process id into the file.
             ::write(pfd, pid.str().data(), pid.str().length());
             return false;
         }
 #endif
     }
-    return pinst_;
+    return primary_;
 }
 ~~~
 
@@ -245,9 +244,9 @@ extern void program();
 namespace ni {
 
 #if _WIN32
-    typedef DWORD  app_id;
+    typedef DWORD  process_id;
 #elif __unix__ 
-    typedef pid_t app_id;
+    typedef pid_t process_id;
 #endif
 
     class app {
@@ -259,13 +258,12 @@ namespace ni {
         static int ret_code;
 
         // Process id.
-        static app_id id();
+        static process_id pid();
 
         // Is another instance already running?
         static bool is_primary_instance();
 
     private:
-        static app_id id_;
         static bool pinst_;
     };
 
@@ -273,7 +271,7 @@ namespace ni {
     bool app::pinst_ = false;
     std::vector<std::string> app::args;
 
-    app_id app::id() {
+    process_id app::pid() {
 #if _WIN32
         return ::GetCurrentProcessId();
 #elif __unix__
@@ -295,7 +293,7 @@ namespace ni {
             // Pid file needs to go to /var/run
             std::ostringstream pfname, pid;
             pfname << "/tmp/" << aname << ".pid";
-            pid << ni::app::id() << std::endl;
+            pid << ni::app::pid() << std::endl;
 
             // Open, lock, and forget. Let the OS close and unlock.
             int pfd = ::open(pfname.str().data(), O_CREAT | O_RDWR, 0666);
