@@ -38,7 +38,7 @@ namespace ni {
     class resource {
     public:
         // Create and destroy pattern.
-        virtual T create() const = 0;
+        virtual T create() = 0;
         virtual void destroy() noexcept = 0;
 
         // Id setter.
@@ -47,7 +47,8 @@ namespace ni {
         // Id getter with lazy eval.
         virtual T instance() const {
             // Lazy evaluate by callign create.
-            if (instance_ == nullptr) instance(create());
+            if (instance_ == nullptr) 
+                instance_ = const_cast<resource<T>*>(this)->create();
             // Return.
             return instance_;
         }
@@ -64,10 +65,12 @@ namespace ni {
 
     class wnd : public resource<wnd_instance> {
     public:
+        virtual ~wnd() { destroy(); }
         virtual wnd_instance create() = 0;
         void destroy() noexcept override {
 #if _WIN32
-            ::DestroyWindow(instance(true)); instance(nullptr);
+            if (initialized())
+                ::DestroyWindow(instance()); instance(nullptr);
 #elif __unix__ 
 
 #endif
@@ -76,7 +79,7 @@ namespace ni {
 
     class app_wnd : public wnd {
     public:
-        app_wnd(std::string title, size size) {
+        app_wnd(std::string title, size size) : wnd() {
             title_=title;
             size_=size;
         }
@@ -84,6 +87,10 @@ namespace ni {
     private:
         std::string title_;
         size size_;
+#if WIN32
+        WNDCLASSEX wcex_;
+        std::string class_;
+#endif
     };
 
     class app {
@@ -179,13 +186,29 @@ namespace ni {
         return primary_;
     }
 
+#if __unix__ 
     void app::gtk_app_activate(GtkApplication *app, gpointer user_data) {
         wnd2void *wv2=static_cast<wnd2void*>(user_data); // Get window structure.
         gtk_widget_show_all ((wv2->w).instance());
     }
+#endif
 
     void app::run(const app_wnd& w) {
 #if _WIN32
+        // Show window.
+        ::ShowWindow(w.instance(), SW_SHOWNORMAL);
+
+        // Message loop.
+        MSG msg;
+        while (::GetMessage(&msg, NULL, 0, 0))
+        {
+            ::TranslateMessage(&msg);
+            ::DispatchMessage(&msg);
+        }
+
+        // Finally, set the return code.
+        ret_code = (int)msg.wParam;
+
 #elif __unix__ 
         // Create application instance.
         instance_ = ::gtk_application_new(name().data(),G_APPLICATION_FLAGS_NONE);
@@ -202,7 +225,36 @@ namespace ni {
 
     wnd_instance app_wnd::create() {
 #if _WIN32
-        ::DestroyWindow(instance(true)); instance(nullptr);
+
+        // Get class.
+        class_ = app::name();
+
+        // Register window.
+        ::ZeroMemory(&wcex_, sizeof(WNDCLASSEX));
+        wcex_.cbSize = sizeof(WNDCLASSEX);
+        wcex_.lpfnWndProc = ::DefWindowProc;
+        wcex_.hInstance = app::instance();
+        wcex_.lpszClassName = class_.data();
+        wcex_.hCursor = ::LoadCursor(NULL, IDC_ARROW);
+
+        if (!::RegisterClassEx(&wcex_)) nullptr; // TODO: Throw an error.
+
+        // Create it.
+        HWND hwnd = ::CreateWindowEx(
+            0,
+            class_.data(),
+            title_.data(),
+            WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT, CW_USEDEFAULT,
+            size_.width, size_.height,
+            NULL,
+            NULL,
+            app::instance(),
+            this);
+
+        if (!hwnd) return nullptr; // TODO: Throw an error.
+
+        return hwnd;
 #elif __unix__ 
         wnd_instance w = gtk_application_window_new (app::instance());
         gtk_window_set_title (GTK_WINDOW (w), title_.data());
@@ -245,5 +297,7 @@ int main(int argc, char* argv[]) {
 using namespace ni;
 
 void program() {
-    // Your code here.
+    app::run(
+        app_wnd("Hello World!", { 640, 400 })
+    );
 }
