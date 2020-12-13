@@ -53,7 +53,7 @@ namespace ni {
             _In_ LPSTR lpCmdLine,
             _In_ int nShowCmd);
 #elif __unix__
-        friend int ::main(int argc, char* argv[]);
+        friend int main(int argc, char* argv[]);
 #endif
     };
 
