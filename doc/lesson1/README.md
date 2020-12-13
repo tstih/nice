@@ -35,8 +35,12 @@ application entry point.
 
 ## Nice Application
 
-Lets start this process by declaring an standard entry point function called `program()`
-and a basic application class for storing command line arguments, and return code.
+Lets start this process by declaring an standard entry point function called `program()`,
+a basic application class for storing command line arguments, and return code, and a function
+to return application name.
+
+ > First command line argument is by convention the name of the executable. 
+ > We can conjure application name by stripping it of path and extension.
 
 ~~~cpp
 #include <string>
@@ -49,10 +53,15 @@ namespace ni {
     public:
         static std::vector<std::string> args;
         static int ret_code;
+        static std::string name();
     };
 
     int app::ret_code = 0; // Default return code.
     std::vector<std::string> app::args;
+
+    std::string app::name() {
+        return std::filesystem::path(args[0]).stem().string();
+    }
 }
 ~~~
 
@@ -93,7 +102,7 @@ return value.
 
  > To change the return value, assign the new value to the `ni::app::ret_code` in your `program()` function.
 
-## Evolving the app class
+## Application instance and process identifier
 
 In the code fragment above four parameters are passed to the `WinMain()` function.
 And all four are ignored. Actually we implicitly use the `lpCmdLine` parameter, 
@@ -109,31 +118,39 @@ of this application is already running, on a plate.
 
 Unfortunately, it only worked in 16 bit version of Windows. Modern Windows
 always sets `hPrevInstance` to NULL, and `hInstance` to an internal memory address of the
-application which is not the same as process identifier. But they did manage to place
-the need for this into our brains and now our library must have these two features.
+application which is not the same as process identifier. Hence we need to implement our
+own logic for checking if the application is already running and obtaining a process
+identifier.
 
-To add them to the app class let us create an abstraction for the process id, and 
-add new members to the app class.
+> Because some Win32 API calls still require passing the old `hInstance`, we need to 
+> store it too. 
+
+So let's implement this logic.
 
 ~~~cpp
 #if _WIN32
-    typedef DWORD  process_id;
+    typedef DWORD  app_id; 
+    typedef HINSTANCE app_instance;
 #elif __unix__ 
-    typedef pid_t process_id;
+    typedef pid_t app_id;
+    typedef voidn* app_instance; // Reserved for Lesson 2.
 #endif
 
 class app {
 public:
     static std::vector<std::string> args;
     static int ret_code;
-    static process_id pid(); // Return unique process id.
+    static app_id id(); // Return unique process id.
     static bool is_primary_instance();  // Is application already running?
-
+    static app_instance instance(); 
 private:
     static bool primary_; // Are we the primary instance?
+    static app_instance instance_; // We'll store hInstance here.
 };
 
 bool app::primary_ = false;
+app_instance instance_ = nullptr;
+
 int app::ret_code = 0;
 std::vector<std::string> app::args;
 ~~~
@@ -144,7 +161,7 @@ On unix we can obtain process id by calling the `getpid()`, and on Windows we ha
 the `GetCurrentProcessId()` function for that.
 
 ~~~cpp
-process_id app::pid() {
+app_id app::id() {
 #if _WIN32
     return ::GetCurrentProcessId();
 #elif __unix__
@@ -183,7 +200,7 @@ Here's the code implementing this logic.
 bool app::is_primary_instance() {
     // Are we already primary instance? If not, try to become one.
     if (!primary_) {
-        std::string aname = std::filesystem::path(args[0]).stem().string();
+        std::string aname = app::name();
 #if _WIN32
         // Create local mutex.
         std::ostringstream name;
@@ -217,12 +234,19 @@ inside the `is_primary_instance()` function, hence the first application to call
 function is officially the primary instance of its kind. For simplicity 
 sake, we add initial call to this function into the `WinMain()` / `main()`.
 
+### Storing application instance
+
+To store `hInstnace` we need to make `WinMain()` function a friend of the `app`
+class to gain access to its private members, and we do the assignment inside `WinMain()`.
+
+ > We could also call `::GetModuleInstance(NULL)` to obtain `hInstance` without passing it.
+
 ## Conclusion
 
 In this first lesson you learned how nice is initialized, what the application class offers 
 to you and how platform specific code is isolated.
 
-Next week we will write about windows and event handling.
+Next week we will write about windows.
 
 ## Listing
 
@@ -244,9 +268,10 @@ extern void program();
 namespace ni {
 
 #if _WIN32
-    typedef DWORD  process_id;
+    typedef DWORD  app_id;
+    typedef HINSTANCE app_instance;
 #elif __unix__ 
-    typedef pid_t process_id;
+    typedef pid_t app_id;
 #endif
 
     class app {
@@ -257,21 +282,48 @@ namespace ni {
         // Return code.
         static int ret_code;
 
-        // Process id.
-        static process_id pid();
+        // Application (process) id.
+        static app_id id();
+
+        // Application name. First cmd line arg without extension.
+        static std::string name();
+
+        // Application instance.
+        static app_instance instance();
 
         // Is another instance already running?
         static bool is_primary_instance();
 
     private:
-        static bool pinst_;
+        static bool primary_;
+        static app_instance instance_;
+
+#if _WIN32
+        friend int WINAPI ::WinMain(
+            _In_ HINSTANCE hInstance,
+            _In_opt_ HINSTANCE hPrevInstance,
+            _In_ LPSTR lpCmdLine,
+            _In_ int nShowCmd);
+#elif __unix__
+        friend int ::main(int argc, char* argv[]);
+#endif
     };
 
     int app::ret_code = 0;
-    bool app::pinst_ = false;
     std::vector<std::string> app::args;
 
-    process_id app::pid() {
+    bool app::primary_ = false;
+    app_instance app::instance_ = nullptr;
+
+    std::string app::name() {
+        return std::filesystem::path(args[0]).stem().string();
+    }
+
+    app_instance app::instance() {
+        return instance_;
+    }
+
+    app_id app::id() {
 #if _WIN32
         return ::GetCurrentProcessId();
 #elif __unix__
@@ -280,33 +332,33 @@ namespace ni {
     }
     bool app::is_primary_instance() {
         // Are we already primary instance? If not, try to become one.
-        if (!pinst_) {
-            std::string aname = std::filesystem::path(args[0]).stem().string();
+        if (!primary_) {
+            std::string aname = app::name();
 #if _WIN32
             // Create local mutex.
             std::ostringstream name;
             name << "Local\\" << aname;
             ::CreateMutex(0, FALSE, name.str().data());
             // We are primary instance.
-            pinst_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
+            primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
 #elif __unix__
             // Pid file needs to go to /var/run
             std::ostringstream pfname, pid;
             pfname << "/tmp/" << aname << ".pid";
-            pid << ni::app::pid() << std::endl;
+            pid << ni::app::id() << std::endl;
 
             // Open, lock, and forget. Let the OS close and unlock.
             int pfd = ::open(pfname.str().data(), O_CREAT | O_RDWR, 0666);
             int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
-            pinst_ = !(rc && EWOULDBLOCK == errno);
-            if (pinst_) {
+            primary_ = !(rc && EWOULDBLOCK == errno);
+            if (primary_) {
                 // Write our process id into the file.
                 ::write(pfd, pid.str().data(), pid.str().length());
                 return false;
             }
 #endif
         }
-        return pinst_;
+        return primary_;
     }
 }
 
@@ -320,6 +372,9 @@ int WINAPI WinMain(
     // Store cmd line arguments to vector.
     int argc = __argc;
     char** argv = __argv;
+
+    ni::app::instance_ = hInstance;
+
 #elif __unix__
 int main(int argc, char* argv[]) {
 #endif

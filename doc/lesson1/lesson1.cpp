@@ -15,9 +15,11 @@ extern void program();
 namespace ni {
 
 #if _WIN32
-    typedef DWORD  process_id;
+    typedef DWORD  app_id;
+    typedef HINSTANCE app_instance;
 #elif __unix__ 
-    typedef pid_t process_id;
+    typedef pid_t app_id;
+    typedef void* app_instance;
 #endif
 
     class app {
@@ -28,21 +30,48 @@ namespace ni {
         // Return code.
         static int ret_code;
 
-        // Process id.
-        static process_id pid();
+        // Application (process) id.
+        static app_id id();
+
+        // Application name. First cmd line arg without extension.
+        static std::string name();
+
+        // Application instance.
+        static app_instance instance();
 
         // Is another instance already running?
         static bool is_primary_instance();
 
     private:
-        static bool pinst_;
+        static bool primary_;
+        static app_instance instance_;
+
+#if _WIN32
+        friend int WINAPI ::WinMain(
+            _In_ HINSTANCE hInstance,
+            _In_opt_ HINSTANCE hPrevInstance,
+            _In_ LPSTR lpCmdLine,
+            _In_ int nShowCmd);
+#elif __unix__
+        friend int ::main(int argc, char* argv[]);
+#endif
     };
 
     int app::ret_code = 0;
-    bool app::pinst_ = false;
     std::vector<std::string> app::args;
 
-    process_id app::pid() {
+    bool app::primary_ = false;
+    app_instance app::instance_ = nullptr;
+
+    std::string app::name() {
+        return std::filesystem::path(args[0]).stem().string();
+    }
+
+    app_instance app::instance() {
+        return instance_;
+    }
+
+    app_id app::id() {
 #if _WIN32
         return ::GetCurrentProcessId();
 #elif __unix__
@@ -51,33 +80,33 @@ namespace ni {
     }
     bool app::is_primary_instance() {
         // Are we already primary instance? If not, try to become one.
-        if (!pinst_) {
-            std::string aname = std::filesystem::path(args[0]).stem().string();
+        if (!primary_) {
+            std::string aname = app::name();
 #if _WIN32
             // Create local mutex.
             std::ostringstream name;
             name << "Local\\" << aname;
             ::CreateMutex(0, FALSE, name.str().data());
             // We are primary instance.
-            pinst_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
+            primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
 #elif __unix__
             // Pid file needs to go to /var/run
             std::ostringstream pfname, pid;
             pfname << "/tmp/" << aname << ".pid";
-            pid << ni::app::pid() << std::endl;
+            pid << ni::app::id() << std::endl;
 
             // Open, lock, and forget. Let the OS close and unlock.
             int pfd = ::open(pfname.str().data(), O_CREAT | O_RDWR, 0666);
             int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
-            pinst_ = !(rc && EWOULDBLOCK == errno);
-            if (pinst_) {
+            primary_ = !(rc && EWOULDBLOCK == errno);
+            if (primary_) {
                 // Write our process id into the file.
                 ::write(pfd, pid.str().data(), pid.str().length());
                 return false;
             }
 #endif
         }
-        return pinst_;
+        return primary_;
     }
 }
 
@@ -91,6 +120,9 @@ int WINAPI WinMain(
     // Store cmd line arguments to vector.
     int argc = __argc;
     char** argv = __argv;
+
+    ni::app::instance_ = hInstance;
+
 #elif __unix__
 int main(int argc, char* argv[]) {
 #endif
