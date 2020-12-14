@@ -211,7 +211,8 @@ namespace ni {
 
 #elif __unix__ 
         // Create application instance.
-        instance_ = ::gtk_application_new(name().data(),G_APPLICATION_FLAGS_NONE);
+        char *app_name=name().data();
+        instance_ = ::gtk_application_new(NULL,G_APPLICATION_FLAGS_NONE);
         // Connect activate.
         wnd2void w2v { w };
         g_signal_connect (instance_, "activate", G_CALLBACK (app::gtk_app_activate), &w2v);
