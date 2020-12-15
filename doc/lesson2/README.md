@@ -177,7 +177,7 @@ expensive underlying system resource is never created.
 
 ## Base window class
 
-Now that we have two phase construction pattern, we can create
+Now that we have the two phase construction pattern, we can create
 base window class.
 
 ~~~cpp
@@ -251,13 +251,24 @@ wnd_instance app_wnd::create() {
 
     return hwnd;
 #elif __unix__ 
-    wnd_instance w = gtk_application_window_new (app::instance());
-    gtk_window_set_title (GTK_WINDOW (w), title_.c_str());
-    gtk_window_set_default_size (GTK_WINDOW (w), size_.width, size_.height);
+    // Create it.
+    wnd_instance w = ::gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
+    // Set title and height.
+    ::gtk_window_set_title (GTK_WINDOW (w), title_.c_str());
+    ::gtk_window_set_default_size (GTK_WINDOW (w), size_.width, size_.height);
+
+    // Make it closeable.
+    ::g_signal_connect(w, "destroy",G_CALLBACK(::gtk_main_quit), NULL);  
     return w;
 #endif
 }
 ~~~
 
-
+In the code above we derive base window class `wnd` from the `resource` class
+and implement virtual `create()` and concrete `destroy()` function. We then
+derive `app_wnd` window from `wnd` class and implement concrete `create()`
+window which creates top window resource and connects quit messages so that
+the application can be closed. Other window messages are forwarded to default
+handlers.
 

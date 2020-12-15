@@ -22,7 +22,7 @@ namespace ni {
     typedef LONG coord;
 #elif __unix__ 
     typedef pid_t app_id;
-    typedef GtkApplication* app_instance;
+    typedef GtkApplication* app_instance; // Not used.
     typedef GtkWidget* wnd_instance;
     typedef int coord;
 #endif
@@ -135,8 +135,6 @@ namespace ni {
             _In_ int nShowCmd);
 #elif __unix__
         friend int main(int argc, char* argv[]);
-        struct wnd2void{const app_wnd& w;};
-        static void gtk_app_activate (GtkApplication *app, gpointer user_data);
 #endif
     };
 
@@ -193,13 +191,6 @@ namespace ni {
         return primary_;
     }
 
-#if __unix__ 
-    void app::gtk_app_activate(GtkApplication *app, gpointer user_data) {
-        wnd2void *wv2=static_cast<wnd2void*>(user_data); // Get window structure.
-        gtk_widget_show_all ((wv2->w).instance());
-    }
-#endif
-
     void app::run(const app_wnd& w) {
 #if _WIN32
         // Show window.
@@ -217,16 +208,11 @@ namespace ni {
         ret_code = (int)msg.wParam;
 
 #elif __unix__ 
-        // Create application instance.
-        char *app_name=name().c_str();
-        instance_ = ::gtk_application_new(NULL,G_APPLICATION_FLAGS_NONE);
-        // Connect activate.
-        wnd2void w2v { w };
-        g_signal_connect (instance_, "activate", G_CALLBACK (app::gtk_app_activate), &w2v);
+        // Show window. Will lazy evaluate window.
+        gtk_widget_show(w.instance());
+
         // Message loop.
-        ret_code = ::g_application_run(G_APPLICATION(instance_), 0, NULL);
-        // Cleanup.
-        ::g_object_unref(instance_);
+        gtk_main();
 #endif
     }
 
@@ -263,9 +249,15 @@ namespace ni {
 
         return hwnd;
 #elif __unix__ 
-        wnd_instance w = gtk_application_window_new (app::instance());
-        gtk_window_set_title (GTK_WINDOW (w), title_.c_str());
-        gtk_window_set_default_size (GTK_WINDOW (w), size_.width, size_.height);
+        // Create it.
+        wnd_instance w = ::gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
+        // Set title and height.
+        ::gtk_window_set_title (GTK_WINDOW (w), title_.c_str());
+        ::gtk_window_set_default_size (GTK_WINDOW (w), size_.width, size_.height);
+
+        // Make it closeable.
+        ::g_signal_connect(w, "destroy",G_CALLBACK(::gtk_main_quit), NULL);  
         return w;
 #endif
     }
@@ -286,6 +278,10 @@ int WINAPI WinMain(
 
 #elif __unix__
 int main(int argc, char* argv[]) {
+
+    // Initialize GTK (classic init, without GtkApplication, don't process cmd line).
+    ::gtk_init(NULL,NULL); 
+
 #endif
 
     // Copy cmd line arguments to vector.
