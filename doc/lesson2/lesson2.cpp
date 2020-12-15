@@ -71,8 +71,6 @@ namespace ni {
 #if _WIN32
             if (initialized())
                 ::DestroyWindow(instance()); instance(nullptr);
-#elif __unix__ 
-
 #endif
         }
     };
@@ -90,6 +88,15 @@ namespace ni {
 #if WIN32
         WNDCLASSEX wcex_;
         std::string class_;
+        static LRESULT CALLBACK global_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+            switch (message) {
+            case WM_DESTROY:
+                ::PostQuitMessage(0);
+                break;
+            }
+            // If we are here, do the default stuff.
+            return ::DefWindowProc(hWnd, message, wParam, lParam);
+        }
 #endif
     };
 
@@ -163,7 +170,7 @@ namespace ni {
             // Create local mutex.
             std::ostringstream name;
             name << "Local\\" << aname;
-            ::CreateMutex(0, FALSE, name.str().data());
+            ::CreateMutex(0, FALSE, name.str().c_str());
             // We are primary instance.
             primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
 #elif __unix__
@@ -173,12 +180,12 @@ namespace ni {
             pid << ni::app::id() << std::endl;
 
             // Open, lock, and forget. Let the OS close and unlock.
-            int pfd = ::open(pfname.str().data(), O_CREAT | O_RDWR, 0666);
+            int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
             int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
             primary_ = !(rc && EWOULDBLOCK == errno);
             if (primary_) {
                 // Write our process id into the file.
-                ::write(pfd, pid.str().data(), pid.str().length());
+                ::write(pfd, pid.str().c_str(), pid.str().length());
                 return false;
             }
 #endif
@@ -211,7 +218,7 @@ namespace ni {
 
 #elif __unix__ 
         // Create application instance.
-        char *app_name=name().data();
+        char *app_name=name().c_str();
         instance_ = ::gtk_application_new(NULL,G_APPLICATION_FLAGS_NONE);
         // Connect activate.
         wnd2void w2v { w };
@@ -226,16 +233,15 @@ namespace ni {
 
     wnd_instance app_wnd::create() {
 #if _WIN32
-
         // Get class.
         class_ = app::name();
 
         // Register window.
         ::ZeroMemory(&wcex_, sizeof(WNDCLASSEX));
         wcex_.cbSize = sizeof(WNDCLASSEX);
-        wcex_.lpfnWndProc = ::DefWindowProc;
+        wcex_.lpfnWndProc = global_wnd_proc;
         wcex_.hInstance = app::instance();
-        wcex_.lpszClassName = class_.data();
+        wcex_.lpszClassName = class_.c_str();
         wcex_.hCursor = ::LoadCursor(NULL, IDC_ARROW);
 
         if (!::RegisterClassEx(&wcex_)) nullptr; // TODO: Throw an error.
@@ -243,8 +249,8 @@ namespace ni {
         // Create it.
         HWND hwnd = ::CreateWindowEx(
             0,
-            class_.data(),
-            title_.data(),
+            class_.c_str(),
+            title_.c_str(),
             WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT, CW_USEDEFAULT,
             size_.width, size_.height,
@@ -258,7 +264,7 @@ namespace ni {
         return hwnd;
 #elif __unix__ 
         wnd_instance w = gtk_application_window_new (app::instance());
-        gtk_window_set_title (GTK_WINDOW (w), title_.data());
+        gtk_window_set_title (GTK_WINDOW (w), title_.c_str());
         gtk_window_set_default_size (GTK_WINDOW (w), size_.width, size_.height);
         return w;
 #endif
