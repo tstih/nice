@@ -272,27 +272,103 @@ window which creates top window resource and connects quit messages so that
 the application can be closed. Other window messages are forwarded to default
 handlers.
 
-## Single header library
+## Extending the application and startup code
 
-It is time to make nice into a simple header library. We separate our main 
-test case into the lesson2.cpp. 
+Adding the main window and the message loop to the application class 
+requires changing system startup function and adding the `run()` function 
+to the app class.
+
+### Updating system startup function
+
+The startup function needs to initialize the GTK3 framework.
+
+ > We initialize GTK3 the old way with gtk_init and not via the 
+ > GtkApplication* functions.
 
 ~~~cpp
-#include "nice.hpp"
+#if _WIN32
+int WINAPI WinMain(
+    _In_ HINSTANCE hInstance,
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPSTR lpCmdLine,
+    _In_ int nShowCmd)
+{
+    // Store cmd line arguments to vector.
+    int argc = __argc;
+    char** argv = __argv;
+#elif __unix__
+int main(int argc, char* argv[]) {
+    // Initialize GTK (classic init, without GtkApplication, don't process cmd line).
+    ::gtk_init(NULL, NULL);
+#endif
+    // Copy cmd line arguments to vector.
+    ni::app::args = std::vector<std::string>(argv, argv + argc);
 
-using namespace ni;
-
-void program() {
-    app::run(
-        app_wnd("Hello World!", { 640, 400 })
-    );
+    // Try becoming primary instance...
+    ni::app::is_primary_instance();
+    
+    // Run program.
+    program();
+    
+    // And return return code;
+    return ni::app::ret_code;
 }
 ~~~
 
-We then create template for nice.hpp to prevent including it twice.
+### Updating the application class
 
- > Including it twice would create two instances of static variables and
- > results would be unpredictable
+Let's add the `run()` function. It accepts const reference to 'app_wnd' so that
+you can pass temporary objects, which enables a bit nicer initialization(s).
+
+This new function does the same under Windows and GTK3 - it shows main window and
+enters the main loop.
+
+~~~cpp
+class app {
+public:
+    // ... code omitted ...
+    static void run(const app_wnd& w);
+    // ... code omitted ...
+};
+
+void app::run(const app_wnd& w) {
+#if _WIN32
+    // Show window.
+    ::ShowWindow(w.instance(), SW_SHOWNORMAL);
+
+    // Message loop.
+    MSG msg;
+    while (::GetMessage(&msg, NULL, 0, 0))
+    {
+        ::TranslateMessage(&msg);
+        ::DispatchMessage(&msg);
+    }
+
+    // Finally, set the return code.
+    ret_code = (int)msg.wParam;
+
+#elif __unix__ 
+    // Show window. Will lazy evaluate window.
+    gtk_widget_show(w.instance());
+
+    // Message loop.
+    gtk_main();
+#endif
+}
+~~~
+
+
+## Single header library
+
+Finally - to create a simple header library, we need to separate the nice framework from
+the `program()` function. 
+
+The template for `nice.hpp` must prevent redundant inclusion of this header
+file to enssure only one instance of nice static variables exists. Failing to do
+so would result in unpredictable behaviour. We do this by enclosing the nice
+framework code with preprocessor directive.
+
+ > Another option to do this would be #pragma once.
 
  ~~~cpp
 #ifndef _NICE_HPP
@@ -303,6 +379,8 @@ We then create template for nice.hpp to prevent including it twice.
 #endif // _NICE_HPP
 ~~~
 
+This is it for today. In next lesson we will introduce event routing,
+and drawing to the windows surface.
 
 ## Listing: nice.hpp
 
@@ -437,31 +515,23 @@ namespace ni {
 
     private:
         static bool primary_;
-        static app_instance instance_;
-
-#if _WIN32
-        friend int WINAPI::WinMain(
-            _In_ HINSTANCE hInstance,
-            _In_opt_ HINSTANCE hPrevInstance,
-            _In_ LPSTR lpCmdLine,
-            _In_ int nShowCmd);
-#elif __unix__
-        friend int main(int argc, char* argv[]);
-#endif
     };
 
     int app::ret_code = 0;
     std::vector<std::string> app::args;
 
     bool app::primary_ = false;
-    app_instance app::instance_ = nullptr;
 
     std::string app::name() {
         return std::filesystem::path(args[0]).stem().string();
     }
 
     app_instance app::instance() {
-        return instance_;
+#if _WIN32
+        return ::GetModuleHandle(NULL);
+#elif __unix__
+        return nullptr;
+#endif
     }
 
     app_id app::id() {
@@ -585,26 +655,20 @@ int WINAPI WinMain(
     // Store cmd line arguments to vector.
     int argc = __argc;
     char** argv = __argv;
-
-    ni::app::instance_ = hInstance;
-
 #elif __unix__
 int main(int argc, char* argv[]) {
-
     // Initialize GTK (classic init, without GtkApplication, don't process cmd line).
     ::gtk_init(NULL, NULL);
-
 #endif
-
     // Copy cmd line arguments to vector.
     ni::app::args = std::vector<std::string>(argv, argv + argc);
 
     // Try becoming primary instance...
     ni::app::is_primary_instance();
-
+    
     // Run program.
     program();
-
+    
     // And return return code;
     return ni::app::ret_code;
 }
