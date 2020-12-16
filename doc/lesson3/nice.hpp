@@ -13,6 +13,8 @@ extern "C" {
 #include <vector>
 #include <filesystem>
 #include <sstream>
+#include <map>
+#include <functional>
 
 extern void program();
 
@@ -23,6 +25,10 @@ namespace ni {
     typedef HINSTANCE app_instance;
     typedef HWND wnd_instance;
     typedef LONG coord;
+    typedef UINT msg;
+    typedef WPARAM par1;
+    typedef LPARAM par2;
+    typedef LRESULT result;
 #elif __unix__ 
     typedef pid_t app_id;
     typedef GtkApplication* app_instance; // Not used.
@@ -34,6 +40,46 @@ namespace ni {
     struct size {
         union { coord width; coord w; };
         union { coord height; coord h; };
+    };
+
+
+    template <typename... Args>
+    class signal {
+    public:
+        signal() : current_id_(0) {}
+        template <typename T> int connect(T* inst, void (T::* func)(Args...)) {
+            return connect([=](Args... args) {
+                (inst->*func)(args...);
+                });
+        }
+
+        template <typename T> int connect(T* inst, void (T::* func)(Args...) const) {
+            return connect([=](Args... args) {
+                (inst->*func)(args...);
+                });
+        }
+
+        int connect(std::function<void(Args...)> const& slot) const {
+            slots_.insert(std::make_pair(++current_id_, slot));
+            return current_id_;
+        }
+
+        void disconnect(int id) const {
+            slots_.erase(id);
+        }
+
+        void disconnect_all() const {
+            slots_.clear();
+        }
+
+        void emit(Args... p) {
+            for (auto const& it : slots_) {
+                it.second(std::forward<Args>(p)...);
+            }
+        }
+    private:
+        mutable std::map<int, std::function<void(Args...)>> slots_;
+        mutable int current_id_;
     };
 
 
@@ -76,13 +122,59 @@ namespace ni {
                 ::DestroyWindow(instance()); instance(nullptr);
 #endif
         }
+
+        // Events of basic window.
+        signal<> created;
+        signal<> destroyed;
+
+    protected:
+#if _WIN32
+        // Generic callback. Calls member callback.
+        static LRESULT CALLBACK global_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+        {
+            // Is it the very first message? Only on WM_NCCREATE.
+            // TODO: Why does Windows 10 send WM_GETMINMAXINFO first?!
+            wnd* self = nullptr;
+            if (message == WM_NCCREATE) {
+                LPCREATESTRUCT lpcs = reinterpret_cast<LPCREATESTRUCT>(lParam);
+                auto self = static_cast<wnd*>(lpcs->lpCreateParams);
+                self->instance(hWnd); // save the window handle too!
+                SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+            }
+            else
+                self = reinterpret_cast<wnd*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+            // Chain...
+            if (self != nullptr)
+                return (self->local_wnd_proc(message, wParam, lParam));
+            else
+                return ::DefWindowProc(hWnd, message, wParam, lParam);
+        }
+
+        // Local callback. Specific to wnd.
+        virtual result local_wnd_proc(msg msg, par1 p1, par2 p2) {
+            switch (msg) {
+            case WM_CREATE:
+                created.emit();
+                break;
+            case WM_DESTROY:
+                destroyed.emit();
+                break;
+            default:
+                return ::DefWindowProc(instance(), msg, p1, p2);
+            }
+            return 0;
+        }
+#endif
     };
 
     class app_wnd : public wnd {
     public:
         app_wnd(std::string title, size size) : wnd() {
-            title_ = title;
-            size_ = size;
+            // Store parameters.
+            title_ = title; size_ = size;
+            // Subscribe to destroy signal.
+            destroyed.connect(this, &app_wnd::on_destroy);
         }
         wnd_instance create() override;
     private:
@@ -91,16 +183,13 @@ namespace ni {
 #if WIN32
         WNDCLASSEX wcex_;
         std::string class_;
-        static LRESULT CALLBACK global_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
-            switch (message) {
-            case WM_DESTROY:
-                ::PostQuitMessage(0);
-                break;
-            }
-            // If we are here, do the default stuff.
-            return ::DefWindowProc(hWnd, message, wParam, lParam);
-        }
 #endif
+    protected:
+        void on_destroy() {
+#if _WIN32
+            ::PostQuitMessage(0);
+#endif
+        }            
     };
 
     class app {
