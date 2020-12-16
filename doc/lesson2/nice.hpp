@@ -128,31 +128,23 @@ namespace ni {
 
     private:
         static bool primary_;
-        static app_instance instance_;
-
-#if _WIN32
-        friend int WINAPI::WinMain(
-            _In_ HINSTANCE hInstance,
-            _In_opt_ HINSTANCE hPrevInstance,
-            _In_ LPSTR lpCmdLine,
-            _In_ int nShowCmd);
-#elif __unix__
-        friend int main(int argc, char* argv[]);
-#endif
     };
 
     int app::ret_code = 0;
     std::vector<std::string> app::args;
 
     bool app::primary_ = false;
-    app_instance app::instance_ = nullptr;
 
     std::string app::name() {
         return std::filesystem::path(args[0]).stem().string();
     }
 
     app_instance app::instance() {
-        return instance_;
+#if _WIN32
+        return ::GetModuleHandle(NULL);
+#elif __unix__
+        return nullptr;
+#endif
     }
 
     app_id app::id() {
@@ -276,26 +268,20 @@ int WINAPI WinMain(
     // Store cmd line arguments to vector.
     int argc = __argc;
     char** argv = __argv;
-
-    ni::app::instance_ = hInstance;
-
 #elif __unix__
 int main(int argc, char* argv[]) {
-
     // Initialize GTK (classic init, without GtkApplication, don't process cmd line).
     ::gtk_init(NULL, NULL);
-
 #endif
-
     // Copy cmd line arguments to vector.
     ni::app::args = std::vector<std::string>(argv, argv + argc);
 
     // Try becoming primary instance...
     ni::app::is_primary_instance();
-
+    
     // Run program.
     program();
-
+    
     // And return return code;
     return ni::app::ret_code;
 }
