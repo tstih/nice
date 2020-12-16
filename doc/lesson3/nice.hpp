@@ -47,19 +47,21 @@ namespace ni {
     class signal {
     public:
         signal() : current_id_(0) {}
-        template <typename T> int connect(T* inst, void (T::* func)(Args...)) {
+        signal(std::function<void()> init) : signal() { init_ = init; }
+        template <typename T> int connect(T* inst, bool (T::* func)(Args...)) {
             return connect([=](Args... args) {
-                (inst->*func)(args...);
+                return (inst->*func)(args...);
                 });
         }
 
-        template <typename T> int connect(T* inst, void (T::* func)(Args...) const) {
+        template <typename T> int connect(T* inst, bool (T::* func)(Args...) const) {
             return connect([=](Args... args) {
-                (inst->*func)(args...);
+                return (inst->*func)(args...);
                 });
         }
 
-        int connect(std::function<void(Args...)> const& slot) const {
+        int connect(std::function<bool(Args...)> const& slot) const {
+            if (!initialized_ && init_ != nullptr) { init_(); initialized_ = true; }
             slots_.insert(std::make_pair(++current_id_, slot));
             return current_id_;
         }
@@ -73,13 +75,16 @@ namespace ni {
         }
 
         void emit(Args... p) {
-            for (auto const& it : slots_) {
-                it.second(std::forward<Args>(p)...);
+            // Iterate in reverse order to first emit to last connections.
+            for (auto it = slots_.rbegin(); it != slots_.rend(); ++it) {
+                if (it->second(std::forward<Args>(p)...)) break;
             }
         }
     private:
-        mutable std::map<int, std::function<void(Args...)>> slots_;
+        mutable std::map<int, std::function<bool(Args...)>> slots_;
         mutable int current_id_;
+        mutable bool initialized_{ false };
+        std::function<void()> init_{ nullptr };
     };
 
 
@@ -124,9 +129,13 @@ namespace ni {
         }
 
         // Events of basic window.
+#if _WIN32
         signal<> created;
         signal<> destroyed;
-
+#elif __unix__
+        signal<> created;
+        signal<> destroyed{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "destroy", G_CALLBACK(wnd::global_gtk_destroy), this); } };
+#endif
     protected:
 #if _WIN32
         // Generic callback. Calls member callback.
@@ -139,10 +148,10 @@ namespace ni {
                 LPCREATESTRUCT lpcs = reinterpret_cast<LPCREATESTRUCT>(lParam);
                 auto self = static_cast<wnd*>(lpcs->lpCreateParams);
                 self->instance(hWnd); // save the window handle too!
-                SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+                ::SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
             }
             else
-                self = reinterpret_cast<wnd*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+                self = reinterpret_cast<wnd*>(::GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
             // Chain...
             if (self != nullptr)
@@ -165,6 +174,11 @@ namespace ni {
             }
             return 0;
         }
+#elif __unix__
+        static void global_gtk_destroy(GtkWidget* widget, gpointer data) {
+            wnd* w = reinterpret_cast<wnd*>(data);
+            w->destroyed.emit();
+        }
 #endif
     };
 
@@ -185,10 +199,13 @@ namespace ni {
         std::string class_;
 #endif
     protected:
-        void on_destroy() {
+        bool on_destroy() {
 #if _WIN32
             ::PostQuitMessage(0);
+#elif __unix__
+            ::gtk_main_quit();
 #endif
+            return true; // Message processed.
         }            
     };
 
