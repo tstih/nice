@@ -1,4 +1,4 @@
-# Welcome to nice
+ # Welcome to nice
 Nice is a modern C++ micro framework for building desktop applications
 that started as an excercise in modern C++ to refresh my skills. 
 
