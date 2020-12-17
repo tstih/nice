@@ -105,11 +105,11 @@ make
 
 # Nice tutorial
 
-Part 1: [Nice application.](http://github/tstih/nice/doc/lesson1)
+Part 1: [Nice application.](https://github.com/tstih/nice/tree/master/doc/lesson1)
 
-Part 2: [Basic windows.](http://github/tstih/nice/doc/lesson2)
+Part 2: [Basic windows.](https://github.com/tstih/nice/tree/master/doc/lesson2)
 
-Part 3: [Window message routing, and painting.](http://github/tstih/nice/doc/lesson3)
+Part 3: [Window message routing, and painting.](https://github.com/tstih/nice/tree/master/doc/lesson3)
 
 Part 4: Child windows and layouting
 
