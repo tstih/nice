@@ -475,3 +475,10 @@ int main() {
 ~~~ 
 
 This will create
+
+
+
+# Further reading...
+
+http://ptomato.name/advanced-gtk-techniques/html/introduction.html
+https://www.linuxtopia.org/online_books/gui_toolkit_guides/gtk+_gnome_application_development/advanced.html
