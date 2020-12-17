@@ -372,7 +372,7 @@ protected:
 
 Simple, isn't it. We now have window code that rewires `WM_DESTROY` to 
 the `destroyed` signal. So in the `app_wnd` we can close application 
-when this signal is emitted.  
+when this signal is emitted. 
 
 ~~~cpp
 class app_wnd : public wnd {
@@ -392,7 +392,7 @@ private:
 protected:
     void on_destroy() {
         ::PostQuitMessage(0);
-    }            
+    }
 };
 ~~~
 
@@ -434,7 +434,7 @@ static void global_gtk_destroy(GtkWidget* widget, gpointer data) {
     wnd* w = reinterpret_cast<wnd*>(data);
     w->destroyed.emit();
 }
-~~~cpp
+~~~
 
 And, finally, the `signal::connect()` function uses the lambda init function to 
 subscribe upon first connect to our signal.  
