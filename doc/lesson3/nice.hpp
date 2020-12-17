@@ -29,11 +29,13 @@ namespace ni {
     typedef WPARAM par1;
     typedef LPARAM par2;
     typedef LRESULT result;
+    typedef BYTE byte;
 #elif __unix__ 
     typedef pid_t app_id;
     typedef GtkApplication* app_instance; // Not used.
     typedef GtkWidget* wnd_instance;
     typedef int coord;
+    typedef uint8_t byte;
 #endif
 
 
@@ -42,6 +44,26 @@ namespace ni {
         union { coord height; coord h; };
     };
 
+    struct color {
+        byte r;
+        byte g;
+        byte b;
+        byte a;
+    };
+
+    struct pt {
+        union { coord left; coord x; };
+        union { coord top; coord y; };
+    };
+
+    struct rct {
+        union { coord left; coord x; coord x1; };
+        union { coord top; coord y;  coord y1; };
+        union { coord width; coord w; };
+        union { coord height; coord h; };
+        coord x2() { return left + width; }
+        coord y2() { return top + height; }
+    };
 
     template <typename... Args>
     class signal {
