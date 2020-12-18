@@ -30,12 +30,14 @@ namespace ni {
     typedef LPARAM par2;
     typedef LRESULT result;
     typedef BYTE byte;
+    typedef HDC canvas;
 #elif __unix__ 
     typedef pid_t app_id;
     typedef GtkApplication* app_instance; // Not used.
     typedef GtkWidget* wnd_instance;
     typedef int coord;
     typedef uint8_t byte;
+    typedef cairo_surface_t* canvas;
 #endif
 
 
@@ -139,6 +141,26 @@ namespace ni {
     };
 
 
+    class artist {
+    public:
+        // Pass canvas instance, don't own it.
+        artist(const canvas& canvas) {
+            canvas_ = canvas;
+        }
+
+        // Draw a rectangle.
+        void draw_rect(color c, rct r) const {
+#if _WIN32
+            RECT rect{ r.left, r.top, r.x2(), r.y2() };
+            HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
+            ::FrameRect(canvas_, &rect, brush);
+            ::DeleteObject(brush);
+#endif
+        }
+    private:
+        canvas canvas_;
+    };
+
     class wnd : public resource<wnd_instance> {
     public:
         virtual ~wnd() { destroy(); }
@@ -154,9 +176,11 @@ namespace ni {
 #if _WIN32
         signal<> created;
         signal<> destroyed;
+        signal<const artist&> paint;
 #elif __unix__
         signal<> created;
         signal<> destroyed{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "destroy", G_CALLBACK(wnd::global_gtk_destroy), this); } };
+        signal<> destroyed{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "draw", G_CALLBACK(wnd::global_gtk_draw), this); } };
 #endif
     protected:
 #if _WIN32
@@ -191,6 +215,15 @@ namespace ni {
             case WM_DESTROY:
                 destroyed.emit();
                 break;
+            case WM_PAINT: // New paint handler!
+            {
+                PAINTSTRUCT ps;
+                HDC hdc = BeginPaint(instance(), &ps);
+                artist a(hdc);
+                paint.emit(a);
+                EndPaint(instance(), &ps);
+            }
+            break;
             default:
                 return ::DefWindowProc(instance(), msg, p1, p2);
             }

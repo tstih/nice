@@ -19,17 +19,18 @@ using namespace ni;
 
 class main_wnd : public app_wnd {
 public:
-    main_wnd() : app_wnd("Hello world!", {800,600})
+    main_wnd() : app_wnd("Hello world!", { 800,600 })
     {
         // Subscribe to the paint event.
         paint.connect(this, &main_wnd::on_paint);
     }
-private:    
+private:
     // Paint handler, draws red, green and blue rectangles.
-    void on_paint(const artist& a) {
+    bool on_paint(const artist& a) {
         a.draw_rect({ 255,0,0 }, { 100,100,600,400 });
         a.draw_rect({ 0,255,0 }, { 150,150,500,300 });
         a.draw_rect({ 0,0,255 }, { 200,200,400,200 });
+        return true;
     }
 };
 
@@ -496,6 +497,100 @@ struct color {
     };
 ~~~
 
+ > C++ now enables (incomplete!) aggregate initializers, making it easier to pass
+ > structs to functions like this `a.draw_rect({ 255,0,0 }, { 100,100,600,400 })`.
+
 ### Artist
 
-( ... to be continued ... )
+"Every artist was first ana amateur."
+-- Ralph Waldo Emerson
+
+The artist class should know how to create art on a canvas. You know ... paint things, glue photographs, 
+draw text, etc. Most GUI frameworks provide a device independent canvas. The programmers can use it 
+to implement WYSIWYG (what-you-see-is-what-you-get) i.e. write same code to draw on screens, printers, 
+and other devices. In GTK this canvas is called a surface. It MS Windows we call it device context. 
+
+Because the canvas is a system resource, deriving the artist class from our two phase initialization 
+resource class might seem like a good idea. BUT ... system resources create and own their own system 
+resoruces. And the canvas can (and in most situations will be!) passed to the artist.   
+
+~~~cpp
+#if _WIN32
+    typedef HDC canvas;
+#elif __unix__ 
+    typedef cairo_surface_t * canvas;
+#endif
+
+class artist {
+public:
+    // Pass canvas instance, don't own it.
+    artist(const canvas& canvas) {
+        canvas_ = canvas;
+    }
+
+    // Draw a rectangle.
+    void draw_rect(color c, rct r) const {
+#if _WIN32
+        RECT rect = { r.left, r.top, r.x2(), r.y2() };
+        HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
+        ::FrameRect(canvas_, &rect, brush);
+        ::DeleteObject(brush);
+#endif
+    };
+private:
+    canvas canvas_;
+}
+~~~
+
+Now we can include paint window messages to our signal routing. First we need to create the `paint` signal, 
+and add it to our `wnd` class, like this.
+
+~~~cpp
+class wnd : public resource<wnd_instance> {
+public:
+    // ... code omitted ...
+#if _WIN32
+    signal<const artist&> paint;
+#elif __unix__ 
+    signal<> destroyed{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "draw", G_CALLBACK(wnd::global_gtk_draw), this); } };
+#endif
+    // ... code omitted ...
+}
+~~~
+
+And, finally, we need to forward it to the correct window in our window procedures.
+
+~~~cpp
+class wnd : public resource<wnd_instance> {
+    // ... code omitted ...
+protected:
+#if _WIN32
+    virtual wnd::result local_wnd_proc(msg msg, par1 p1, par2 p2) {
+        switch (msg) {
+        case WM_CREATE:
+            created.emit();
+            break;
+        case WM_DESTROY:
+            destroyed.emit();
+            break;
+        case WM_PAINT: // New paint handler!
+            { 
+                PAINTSTRUCT ps;
+                HDC hdc = BeginPaint(instance(), &ps);
+                artist a(hdc);
+                paint.emit(a);
+                EndPaint(instance(), &ps);
+            }
+            break;
+        default:
+            return ::DefWindowProc(instance(), msg, p1, p2);
+        }
+        return 0;
+    }
+#elif __unix__ 
+#endif
+    // ... code omitted ...
+}
+~~~
+
+
