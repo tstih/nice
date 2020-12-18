@@ -37,7 +37,7 @@ namespace ni {
     typedef GtkWidget* wnd_instance;
     typedef int coord;
     typedef uint8_t byte;
-    typedef cairo_surface_t* canvas;
+    typedef cairo_t* canvas;
 #endif
 
 
@@ -155,6 +155,11 @@ namespace ni {
             HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
             ::FrameRect(canvas_, &rect, brush);
             ::DeleteObject(brush);
+#elif __unix__
+            cairo_set_source_rgb(canvas_, ((float)c.r)/255.0f, ((float)c.g)/255.0f, ((float)c.b)/255.0f);
+            cairo_set_line_width(canvas_, 1);
+            cairo_rectangle(canvas_, r.left + 0.5f, r.top + 0.5F, r.width, r.height );
+            cairo_stroke_preserve(canvas_);
 #endif
         }
     private:
@@ -180,7 +185,7 @@ namespace ni {
 #elif __unix__
         signal<> created;
         signal<> destroyed{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "destroy", G_CALLBACK(wnd::global_gtk_destroy), this); } };
-        signal<> destroyed{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "draw", G_CALLBACK(wnd::global_gtk_draw), this); } };
+        signal<const artist&> paint{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "draw", G_CALLBACK(wnd::global_gtk_draw), this); } };
 #endif
     protected:
 #if _WIN32
@@ -233,6 +238,13 @@ namespace ni {
         static void global_gtk_destroy(GtkWidget* widget, gpointer data) {
             wnd* w = reinterpret_cast<wnd*>(data);
             w->destroyed.emit();
+        }
+        static gboolean global_gtk_draw (GtkWidget *widget, cairo_t *cr, gpointer data)
+        {
+            wnd* w = reinterpret_cast<wnd*>(data);
+            artist a(cr);
+            w->paint.emit(a);
+            return FALSE;
         }
 #endif
     };
@@ -408,12 +420,12 @@ namespace ni {
         // Create it.
         wnd_instance w = ::gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
+        // Make sure it is paintable.
+        ::gtk_widget_set_app_paintable(w,TRUE);
+
         // Set title and height.
         ::gtk_window_set_title(GTK_WINDOW(w), title_.c_str());
         ::gtk_window_set_default_size(GTK_WINDOW(w), size_.width, size_.height);
-
-        // Make it closeable.
-        ::g_signal_connect(w, "destroy", G_CALLBACK(::gtk_main_quit), NULL);
         return w;
 #endif
     }
