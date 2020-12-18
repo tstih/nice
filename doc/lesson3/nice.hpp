@@ -1,10 +1,21 @@
+/*
+ * nice.hpp
+ * 
+ * (Single) header file for the nice GUI library.
+ * 
+ * (c) 2020 Tomaz Stih
+ * This code is licensed under MIT license (see LICENSE.txt for details).
+ * 
+ * 18.12.2020   tstih
+ * 
+ */
 #ifndef _NICE_HPP
 #define _NICE_HPP
 
 extern "C" {
-#if _WIN32
+#if __WIN__
 #include <windows.h>
-#elif __unix__
+#elif __GTK__
 #include <sys/file.h>
 #include <unistd.h>
 #include <gtk/gtk.h>
@@ -20,7 +31,8 @@ extern void program();
 
 namespace ni {
 
-#if _WIN32
+// ----- Unified types. -------------------------------------------------------
+#if __WIN__
     typedef DWORD  app_id;
     typedef HINSTANCE app_instance;
     typedef HWND wnd_instance;
@@ -31,7 +43,7 @@ namespace ni {
     typedef LRESULT result;
     typedef BYTE byte;
     typedef HDC canvas;
-#elif __unix__ 
+#elif __GTK__ 
     typedef pid_t app_id;
     typedef GtkApplication* app_instance; // Not used.
     typedef GtkWidget* wnd_instance;
@@ -41,6 +53,8 @@ namespace ni {
 #endif
 
 
+
+// ----- Unified structures. --------------------------------------------------
     struct size {
         union { coord width; coord w; };
         union { coord height; coord h; };
@@ -67,6 +81,9 @@ namespace ni {
         coord y2() { return top + height; }
     };
 
+
+
+ // ----- Signals. ------------------------------------------------------------
     template <typename... Args>
     class signal {
     public:
@@ -112,6 +129,8 @@ namespace ni {
     };
 
 
+
+// ----- Two phase construction. ----------------------------------------------
     template<typename T>
     class resource {
     public:
@@ -141,6 +160,8 @@ namespace ni {
     };
 
 
+
+// ----- Graphics & painting. -------------------------------------------------
     class artist {
     public:
         // Pass canvas instance, don't own it.
@@ -150,12 +171,12 @@ namespace ni {
 
         // Draw a rectangle.
         void draw_rect(color c, rct r) const {
-#if _WIN32
+#if __WIN__
             RECT rect{ r.left, r.top, r.x2(), r.y2() };
             HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
             ::FrameRect(canvas_, &rect, brush);
             ::DeleteObject(brush);
-#elif __unix__
+#elif __GTK__
             cairo_set_source_rgb(canvas_, ((float)c.r)/255.0f, ((float)c.g)/255.0f, ((float)c.b)/255.0f);
             cairo_set_line_width(canvas_, 1);
             cairo_rectangle(canvas_, r.left + 0.5f, r.top + 0.5F, r.width, r.height );
@@ -166,29 +187,32 @@ namespace ni {
         canvas canvas_;
     };
 
+
+
+// ----- Base window.  --------------------------------------------------------
     class wnd : public resource<wnd_instance> {
     public:
         virtual ~wnd() { destroy(); }
         virtual wnd_instance create() = 0;
         void destroy() noexcept override {
-#if _WIN32
+#if __WIN__
             if (initialized())
                 ::DestroyWindow(instance()); instance(nullptr);
 #endif
         }
 
         // Events of basic window.
-#if _WIN32
+#if __WIN__
         signal<> created;
         signal<> destroyed;
         signal<const artist&> paint;
-#elif __unix__
+#elif __GTK__
         signal<> created;
         signal<> destroyed{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "destroy", G_CALLBACK(wnd::global_gtk_destroy), this); } };
         signal<const artist&> paint{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "draw", G_CALLBACK(wnd::global_gtk_draw), this); } };
 #endif
     protected:
-#if _WIN32
+#if __WIN__
         // Generic callback. Calls member callback.
         static LRESULT CALLBACK global_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
@@ -234,7 +258,7 @@ namespace ni {
             }
             return 0;
         }
-#elif __unix__
+#elif __GTK__
         static void global_gtk_destroy(GtkWidget* widget, gpointer data) {
             wnd* w = reinterpret_cast<wnd*>(data);
             w->destroyed.emit();
@@ -249,6 +273,9 @@ namespace ni {
 #endif
     };
 
+
+
+// ----- Application window. --------------------------------------------------
     class app_wnd : public wnd {
     public:
         app_wnd(std::string title, size size) : wnd() {
@@ -267,15 +294,18 @@ namespace ni {
 #endif
     protected:
         bool on_destroy() {
-#if _WIN32
+#if __WIN__
             ::PostQuitMessage(0);
-#elif __unix__
+#elif __GTK__
             ::gtk_main_quit();
 #endif
             return true; // Message processed.
         }            
     };
 
+
+
+// ----- Application. ---------------------------------------------------------
     class app {
     public:
         // Cmd line arguments.
@@ -313,17 +343,17 @@ namespace ni {
     }
 
     app_instance app::instance() {
-#if _WIN32
+#if __WIN__
         return ::GetModuleHandle(NULL);
-#elif __unix__
+#elif __GTK__
         return nullptr;
 #endif
     }
 
     app_id app::id() {
-#if _WIN32
+#if __WIN__
         return ::GetCurrentProcessId();
-#elif __unix__
+#elif __GTK__
         return ::getpid();
 #endif
     }
@@ -332,14 +362,14 @@ namespace ni {
         // Are we already primary instance? If not, try to become one.
         if (!primary_) {
             std::string aname = app::name();
-#if _WIN32
+#if __WIN__
             // Create local mutex.
             std::ostringstream name;
             name << "Local\\" << aname;
             ::CreateMutex(0, FALSE, name.str().c_str());
             // We are primary instance.
             primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
-#elif __unix__
+#elif __GTK__
             // Pid file needs to go to /var/run
             std::ostringstream pfname, pid;
             pfname << "/tmp/" << aname << ".pid";
@@ -360,7 +390,7 @@ namespace ni {
     }
 
     void app::run(const app_wnd& w) {
-#if _WIN32
+#if __WIN__
         // Show window.
         ::ShowWindow(w.instance(), SW_SHOWNORMAL);
 
@@ -375,7 +405,7 @@ namespace ni {
         // Finally, set the return code.
         ret_code = (int)msg.wParam;
 
-#elif __unix__ 
+#elif __GTK__ 
         // Show window. Will lazy evaluate window.
         gtk_widget_show(w.instance());
 
@@ -385,8 +415,10 @@ namespace ni {
     }
 
 
+
+// ----- Deferred definitions (misc.) ----------------------------------------- 
     wnd_instance app_wnd::create() {
-#if _WIN32
+#if __WIN__
         // Get class.
         class_ = app::name();
 
@@ -416,7 +448,7 @@ namespace ni {
         if (!hwnd) return nullptr; // TODO: Throw an error.
 
         return hwnd;
-#elif __unix__ 
+#elif __GTK__ 
         // Create it.
         wnd_instance w = ::gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
@@ -431,7 +463,10 @@ namespace ni {
     }
 }
 
-#if _WIN32
+
+
+// ----- Application entry point. ---------------------------------------------
+#if __WIN__
 int WINAPI WinMain(
     _In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
@@ -441,7 +476,7 @@ int WINAPI WinMain(
     // Store cmd line arguments to vector.
     int argc = __argc;
     char** argv = __argv;
-#elif __unix__
+#elif __GTK__
 int main(int argc, char* argv[]) {
     // Initialize GTK (classic init, without GtkApplication, don't process cmd line).
     ::gtk_init(NULL, NULL);

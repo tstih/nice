@@ -518,7 +518,7 @@ resoruces. And the canvas can (and in most situations will be!) passed to the ar
 #if _WIN32
     typedef HDC canvas;
 #elif __unix__ 
-    typedef cairo_surface_t * canvas;
+    typedef cairo_t * canvas;
 #endif
 
 class artist {
@@ -535,6 +535,11 @@ public:
         HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
         ::FrameRect(canvas_, &rect, brush);
         ::DeleteObject(brush);
+#elif __unix__
+        cairo_set_source_rgb(canvas_, c.r, c.g, c.b);
+        cairo_set_line_width(canvas_, 1);
+        cairo_rectangle(canvas_, r.left, r.top, r.width, r.height );
+        cairo_stroke_preserve(canvas_);
 #endif
     };
 private:
@@ -552,9 +557,26 @@ public:
 #if _WIN32
     signal<const artist&> paint;
 #elif __unix__ 
-    signal<> destroyed{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "draw", G_CALLBACK(wnd::global_gtk_draw), this); } };
+    signal<const artist&> paint{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "draw", G_CALLBACK(wnd::global_gtk_draw), this); } };
 #endif
     // ... code omitted ...
+}
+~~~
+
+Window needs to be paintable, which can be set by calling the
+
+~~~cpp
+wnd_instance app_wnd::create() {
+    // Create it.
+    wnd_instance w = ::gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
+    // Make sure it is paintable.
+    ::gtk_widget_set_app_paintable(w,TRUE);
+
+    // Set title and height.
+    ::gtk_window_set_title(GTK_WINDOW(w), title_.c_str());
+    ::gtk_window_set_default_size(GTK_WINDOW(w), size_.width, size_.height);
+    return w;
 }
 ~~~
 
@@ -567,12 +589,7 @@ protected:
 #if _WIN32
     virtual wnd::result local_wnd_proc(msg msg, par1 p1, par2 p2) {
         switch (msg) {
-        case WM_CREATE:
-            created.emit();
-            break;
-        case WM_DESTROY:
-            destroyed.emit();
-            break;
+        // ... code omitted ...
         case WM_PAINT: // New paint handler!
             { 
                 PAINTSTRUCT ps;
@@ -587,10 +604,16 @@ protected:
         }
         return 0;
     }
-#elif __unix__ 
+#elif __unix__
+    static gboolean global_gtk_draw (GtkWidget *widget, cairo_t *cr, gpointer data)
+    {
+        wnd* w = reinterpret_cast<wnd*>(data);
+        artist a(cr);
+        w->paint.emit(a);
+        return FALSE;
+    }
 #endif
     // ... code omitted ...
 }
 ~~~
-
 
