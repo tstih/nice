@@ -177,14 +177,30 @@ namespace ni {
             ::FrameRect(canvas_, &rect, brush);
             ::DeleteObject(brush);
 #elif __GTK__
-            cairo_set_source_rgb(canvas_, ((float)c.r)/255.0f, ((float)c.g)/255.0f, ((float)c.b)/255.0f);
+            cairo_set_source_rgb(canvas_, normalize(c.r), normalize(c.g), normalize(c.b));
             cairo_set_line_width(canvas_, 1);
             cairo_rectangle(canvas_, r.left + 0.5f, r.top + 0.5F, r.width, r.height );
-            cairo_stroke_preserve(canvas_);
+            cairo_stroke(canvas_);
+#endif
+        }
+
+        // Draw a rectangle.
+        void fill_rect(color c, rct r) const {
+#if __WIN__
+#elif __GTK__
+            cairo_set_source_rgb(canvas_, normalize(c.r), normalize(c.g), normalize(c.b));
+            cairo_set_line_width(canvas_, 1);
+            cairo_rectangle(canvas_, r.left + 0.5f, r.top + 0.5F, r.width, r.height );
+            cairo_fill(canvas_);
 #endif
         }
     private:
         canvas canvas_;
+#ifdef __GTK__
+        float normalize(int c, int max=255) const {
+            return (float)c / (float) max;
+        }
+#endif
     };
 
 
