@@ -414,7 +414,7 @@ XColor artist::to_xcolor(color c) const {
 
 # Done!
 
-That's it. We've ported nice to X11. And can now execute following code
+That's it. We've ported nice to X11. Now we can execute following code on it.
 
  ~~~cpp
  #include "nice.hpp"
@@ -447,7 +447,7 @@ void program()
 
 Thank you for your patience.
 
-In our next lesson (Lesson 5) we will add some child controls, and crate
+In our next lesson (Lesson 5) we will add some child controls, and create
 a cool layout manager. 
 
 Stay tuned.
