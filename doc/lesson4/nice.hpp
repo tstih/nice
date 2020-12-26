@@ -309,10 +309,8 @@ namespace ni {
             return FALSE;
         }
 #elif __X11__
-        friend void global_handle_x11_event(const XEvent& e);
-        void local_handle_x11_event(const XEvent& e) {
-
-        }
+        friend bool global_handle_x11_event(const XEvent& e);
+        virtual bool local_handle_x11_event(const XEvent& e);
 #endif
     };
 
@@ -379,10 +377,10 @@ namespace ni {
         // Startup functions are our friends.
 #if __WIN__
         friend int WINAPI WinMain(
-            _In_ HINSTANCE hInstance, 
-            _In_opt_ HINSTANCE hPrevInstance, 
-            _In_ LPSTR lpCmdLine, 
-            _In_ int nShowCmd);
+            _In_ HINSTANCE hInstance,
+            _In_opt_ HINSTANCE hPrevInstance,
+            _In_ LPSTR lpCmdLine,
+            _In_ int nShowCmd)
 #elif __GTK__ || __X11__
         friend int ::main(int argc, char* argv[]);
 #endif
@@ -442,9 +440,10 @@ namespace ni {
 
 #if __X11__
     std::map<wnd_instance,wnd*> wmap;
-    void global_handle_x11_event(const XEvent& e) {
-        wnd* w = (wnd*)e.xany.window;
-        w->local_handle_x11_event(e);
+    bool global_handle_x11_event(const XEvent& e) {
+         Window xw= e.xany.window;
+         wnd* w=wmap[xw];
+        return w->local_handle_x11_event(e);
     }
 #endif
 
@@ -473,14 +472,26 @@ namespace ni {
 
 #elif __X11__
 
+        Atom atom = XInternAtom ( app::instance(),"WM_DELETE_WINDOW", false );
+        XSetWMProtocols(app::instance(), w.instance(), &atom, 1);
+
+        // We're interested in...
+        XSelectInput ( app::instance(),
+			 w.instance(),
+			ExposureMask | ButtonPressMask | ButtonReleaseMask | EnterWindowMask | 
+            LeaveWindowMask | PointerMotionMask | FocusChangeMask | KeyPressMask |
+            KeyReleaseMask | SubstructureNotifyMask | StructureNotifyMask | 
+            SubstructureRedirectMask);
+
         ::XMapWindow(app::instance(), w.instance());
         ::XFlush(app::instance());
 
         XEvent e;
-	    while ( true ) // Will be interrupted by the OS.
+        bool quit=false;
+	    while ( !quit ) // Will be interrupted by the OS.
 	    {
 	      ::XNextEvent ( app::instance(),&e );
-	      global_handle_x11_event(e);
+	      quit = global_handle_x11_event(e);
 	    }
 #endif
     }
@@ -564,6 +575,27 @@ namespace ni {
         return w;
 #endif
     }
+
+#if __X11__
+    bool wnd::local_handle_x11_event(const XEvent& e) {
+        bool quit=false;
+        switch ( e.type )
+        {
+        case CreateNotify:
+            created.emit();
+            break;
+        case ClientMessage:
+            Atom atom = XInternAtom ( app::instance(),
+                        "WM_DELETE_WINDOW",
+                        false );
+            if ( atom == e.xclient.data.l[0] )
+                destroyed.emit();
+                quit=true;
+            break;
+        }
+        return quit;
+    }
+#endif
 
 } // namespace
 
