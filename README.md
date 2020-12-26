@@ -21,7 +21,6 @@ The philosophy of nice is to:
  * single exe
  * be multiplatform.
 
-
 # Hello nice
 
 Here's the Hello World application in nice:
@@ -116,11 +115,13 @@ Part 3: [Window message routing, and painting.](https://github.com/tstih/nice/tr
 
 Part 4: [Porting nice to a new platform: X11](https://github.com/tstih/nice/tree/master/doc/lesson4)
 
-Part 5: Child windows and layouting
+Part 5: Child windows and layout managers
 
-Part 5: Custom Controls
+Part 6: Adding a handful of common controls
 
-Part 6: It's all about being nice
+Part 7: Custom Controls
+
+Part 8: It's all about being nice
 
 
 # Bumps on the road
