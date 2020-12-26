@@ -1,14 +1,16 @@
 # Porting nice!
 
-Hello again. If you are reading this then you've read your way through lessons
-one, two, and three. It's now time to repeat everything we learned, and there's
-no better way to do this than to port nice to a new platform. So in this lesson
-we are going to port it to X11 together.
+Hello, again! If you are reading this then you've read your way through lessons
+one, two, and three. It's now time to repeat everything we've learned, and there's
+no better way of doing this than to port nice to a new platform. Thus in this lesson
+we are going to port nice to X11.
+
 
 # Enriching CMakeLists.txt
 
-Let's enrich our CMakeLists.txt to include X11 port and make this port default
-unix port.
+Before making changes to the code, we need to update our CMakeLists.txt to include 
+X11 bindings. Let's keep GTK as default Unix port, and introduce the option to 
+override it. Here is the updated CMakeLists.txt.
 
 ~~~
 # We require 3.8.
@@ -59,21 +61,22 @@ set_property(TARGET lesson4 PROPERTY CXX_STANDARD 20)
 
 Because we now have three options, the `cmake` can't automatically decide what
 to build. If it detects MS Windows it still builds a version for MS Windows, and
-if it detects Unix it tries to build the GTK3 version. But there is no automation
-for X11. You have to pass this request as argument to cmake `cmake -DX11:1`.
+if it detects Unix it builds the GTK3 version. But there is no automation
+for X11. So we have to pass this as an argument to cmake, like this `cmake -DX11:1`.
 
- > Sinilarly you can implicitly require to build versions for GTK (`cmake -DGTK:1`) 
+ > Similarly we can implicitly require to build versions for GTK (`cmake -DGTK:1`) 
  > and MS Windows (`cmake -DWIN:1`). 
+
 
 # How to start?
 
-Starting the port is failry easy. You need to examine all the places with platform
-dependant code. You can find those places by searching for `__WIN__` or `__GTK__`
+A practical way to create a port is to examine all places with platform
+dependant code. You can find them by searching for `__WIN__` or `__GTK__`
 processor directives.
 
 ## Includes
 
-You'll only need to include core X11 files at this point.
+We need core X11 files. This is the new include section.
 
 ~~~cpp
 #if __WIN__
@@ -93,10 +96,10 @@ extern int main(int argc, char* argv[]);
 
 ## Unified types
 
-Most unified types are simple mappings to native type. An exception is type
-`canvas`, which is a structure, holding multiple data, needed for the artist
-to paint. It is neatly packed so that the underlying logic is invisible to the
-user, who simply operates on canvas.
+As with previous two ports, most unified types are mappings to native types. 
+But ... there is an exception. The`canvas` is a pointer to a custom structure, 
+because X11 drawing procedures require extra data, and this is the best way 
+to pass it to the artist. 
 
 ~~~cpp
 #if __WIN__
@@ -129,12 +132,15 @@ user, who simply operates on canvas.
 
 ## Extending the resource class
 
-Because our resource type had hard-coded `nullptr` for default
-value, it did not work with value type. But the `Window` structure of
-XWindows is not a pointer but a value type, incompatible with `nullptr`.
+Surely, you remember the `resource` type? The one we use for the
+two phase construction? This class worked relly well for the first 
+two ports. But hard-coding `nullptr` for default value into it was 
+a bit optimistic. Because it excluded  value types, such as XWindows  
+`Window` structure.
 
-That is why we introduce another template parameter, which tells what is
-resources' `nullptr` value. Like this.
+Let's fix this by introducing another template parameter, 
+which tells the class which is the default value for the `instance_`
+member. 
 
 ~~~cpp
 template<typename T, T N=nullptr>
@@ -166,20 +172,26 @@ private:
 };
 ~~~
 
-To maintain downward compatibility, we set the default value of new
-parameter to `nullptr`.
+To maintain compatibility, let's set the default value of new parameter 
+to `nullptr`. 
+
 
 ## Application
 
-Application entry point needs to take care of some XWindows initialization 
-activities, and the `run` function needs to implement XWindows main
-event loop.
+There are two places where we need to look when creating a new port:
+ * Application entry point (i.e. the `main()` function) where we 
+   need to take care of platform specific initialization,
+ * The application `run()` function where we need to update 
+   the main message loop, and
 
-### Application instance and entry point
+ > Optionally, some application functions might need to change 
+ > (for example: `is_primary_instance()`), but not for X11 port.
 
-The default type for application instance is `XDisplay*` and we set
-it inside the `main()` function. After the event loop finishes, we
-also close the display. Here is the code.
+### Application entry point (and setting an instance!)
+
+The underlying type for application instance for X11 is `XDisplay*` 
+and we need to set it inside the `main()` function. After the event loop 
+finishes, we also need to close the display properly. 
 
 ~~~cpp
 int main(int argc, char* argv[]) {
@@ -203,46 +215,9 @@ int main(int argc, char* argv[]) {
 }
 ~~~
 
- > For `main()` to be able to set the `app::instance_` private member
- > it has to be friend of the `app` class.
+ > For `main()` to be able to set the `app::instance_` it has to be friend 
+ > of the `app` class.
 
-### Primary instance check
-
-Primary instance check for X11 and GTK is the same. So all that we need to do
-is include `__X11__` in the preprocessor check.
-
-~~~cpp
-bool app::is_primary_instance() {
-    // Are we already primary instance? If not, try to become one.
-    if (!primary_) {
-        std::string aname = app::name();
-#if __WIN__
-        // Create local mutex.
-        std::ostringstream name;
-        name << "Local\\" << aname;
-        ::CreateMutex(0, FALSE, name.str().c_str());
-        // We are primary instance.
-        primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
-#elif __GTK__ || __X11__ // The only change!
-        // Pid file needs to go to /var/run
-        std::ostringstream pfname, pid;
-        pfname << "/tmp/" << aname << ".pid";
-        pid << ni::app::id() << std::endl;
-
-        // Open, lock, and forget. Let the OS close and unlock.
-        int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
-        int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
-        primary_ = !(rc && EWOULDBLOCK == errno);
-        if (primary_) {
-            // Write our process id into the file.
-            ::write(pfd, pid.str().c_str(), pid.str().length());
-            return false;
-        }
-#endif
-    }
-    return primary_;
-}
-~~~
 
 ### The message pump
 
@@ -275,48 +250,58 @@ void app::run(const app_wnd& w) {
 }
 ~~~
 
-The main body the pump registers `WM_DELETE_WINDOW` atom, which is a know 
-(weird!) way to catch XWindows closing the main window. We then select which
-events we want to receive by `XSelectInput()`.
+The message pump initially registers the `WM_DELETE_WINDOW` atom, which is  
+*a very dirty* way to detect XWindows closing the main window. 
+After we've registered it, we select which events we want to listen to by 
+calling the `XSelectInput()`.
+We than show the main window by calling the `XMapWindow()`, and enter the
+message loop. Inside, we pass each event to the `global_handle_x11_events()` 
+handler. As we will see later, this handler routes events to local 
+window procedures, just like handlers for Windows and GTK.
 
-After that we show window with `XMapWindow()`, and enter event loop. We pass
-events to the `global_handle_x11_events()` handler, and it forwards them
-to correct window class event handler.
+ > The current `XSelectInput()` call is a bit of an overkill. We subscribe to 
+ > more events than needed. Let's call this an investment into the not so 
+ > distant future. 
 
- > The current message pump for X11 is a bit of an overkill. We subscribe to 
- > more events than needed because we will handle them in the future. 
+### Primary instance check
+
+Primary instance checks for X11 and GTK are the same. So the only change
+is changing preprocessor check from `#if __GTK__` to `#if __GTK__ || __X11__`.
 
 ## Window
 
 The XWindow `Window` doesn't have a nice way of storing data with the native
-structure. So we will connect native structure `Window`, and our `wnd` class
+structure. So we must associate the native `Window`, and our `wnd` class
 using a global map.
+
+ > Actually there is a dirty way of storing data into the `Window` structure,
+ > but we choose to avoid it. We could store an additional pointer to the window
+ > title, after the 0 character, and no one would know it is there.
 
 ~~~cpp
 std::map<wnd_instance,wnd*> wmap;
 ~~~
 
-This map is global and a mapping is added to it whenever `wnd::create()` is called.
-Likewise when the `wnd::destroy()` is called, the mapping for that window is removed 
-from the map.
+A new mapping is added to this map every time the `wnd::create()` is called.
+Likewise when the `wnd::destroy()` is called, the mapping for that window 
+is removed from the map.
 
 ### Events
 
-We are calling our `global_hnadle_x11_event()` in the `app::run()`, and passing
-it every event. We can now utilize our global map `wmap` to route events to their 
-respective local handlers.  
+In the *Message pump* chapter we created the `app::run()`, which calls our 
+ `global_hnadle_x11_event()` and passes events to it. We can now utilize our 
+ global map `wmap` to route these events to their respective local handlers.  
 
 ~~~cpp
 bool global_handle_x11_event(const XEvent& e) {
-    Window xw= e.xany.window;
-    wnd* w=wmap[xw];
-    return w->local_handle_x11_event(e);
+    Window xw = e.xany.window; // Get native structure from the event.
+    wnd* w=wmap[xw]; // Find attached class.
+    return w->local_handle_x11_event(e); // And pass it the event.
 }
 ~~~
 
-The base local handler `wnd::local_handle_x11_event` maps standard events to our
-signals. Observe the `Expose` event (the paint event). It creates a new canvas,
-passes it to the artist, and frees it. 
+The local handler `wnd::local_handle_x11_event` maps (standard!) events to our
+signals. Currently, these events are `created`, `destroyed` and `paint`. 
 
 ~~~cpp
 bool wnd::local_handle_x11_event(const XEvent& e) {
@@ -348,32 +333,33 @@ bool wnd::local_handle_x11_event(const XEvent& e) {
 }
 ~~~
 
-### Create
+### Create window
 
-An application window is created by calling the `::CreateSimpleWindow',
-and inserting it into the map. 
+Following is a school case *(no, really, I copied it from a student's page!)* 
+X11 code for creating a native window. Note that we automatically insert every 
+created window into the global map.
 
 ~~~cpp
-    wnd_instance app_wnd::create() {
-        int s = DefaultScreen(app::instance());
-        Window w = ::XCreateSimpleWindow(
-            app::instance(), 
-            RootWindow(app::instance(), s), 
-            10, // x 
-            10, // y
-            size_.width, 
-            size_.height, 
-            1, // border width
-            BlackPixel(app::instance(), s), // border color
-            WhitePixel(app::instance(), s)  // background color
-        );
-        // Store window to window list.
-        wmap.insert(std::pair<Window,wnd*>(w,this));
-        return w;
-    }
+wnd_instance app_wnd::create() {
+    int s = DefaultScreen(app::instance());
+    Window w = ::XCreateSimpleWindow(
+        app::instance(), 
+        RootWindow(app::instance(), s), 
+        10, // x 
+        10, // y
+        size_.width, 
+        size_.height, 
+        1, // border width
+        BlackPixel(app::instance(), s), // border color
+        WhitePixel(app::instance(), s)  // background color
+    );
+    // Store window to window list.
+    wmap.insert(std::pair<Window,wnd*>(w,this));
+    return w;
+}
 ~~~
 
-### Destroy
+### Destroy window
 
 When the window is destroyed it also removes itself from the map to
 stop routing events to a non-existing object instance.
@@ -391,29 +377,20 @@ void wnd::destroy() noexcept {
 
 ## Artist
 
-And, finally, the artist class is extended to handle painting using XWindows
-poor set of functions. We create a *private* function to help us translate
-our `color` structure to `XColor`, and modify draw rectangle function for X11.
+Finally, the artist class is extended to handle painting using XWindows
+poor set of drawing functions. Besides modifying draw rectangle function
+to call X11 natives, we also need to create a *private* function to help 
+us translate our `color` to `XColor`.
+
+The code for both is below.
 
 ~~~cpp
 // Draw a rectangle.
 void artist::draw_rect(color c, rct r) const {
-#if __WIN__
-    RECT rect{ r.left, r.top, r.x2(), r.y2() };
-    HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
-    ::FrameRect(canvas_, &rect, brush);
-    ::DeleteObject(brush);
-#elif __GTK__
-    cairo_set_source_rgb(canvas_, normalize(c.r), normalize(c.g), normalize(c.b));
-    cairo_set_line_width(canvas_, 1);
-    cairo_rectangle(canvas_, r.left + 0.5f, r.top + 0.5F, r.width, r.height );
-    cairo_stroke(canvas_);
-#elif __X11__
     XColor pix=to_xcolor(c);
     XSetForeground(canvas_.d, canvas_.gc, pix.pixel);
     XDrawRectangle(canvas_.d, canvas_.w, canvas_.gc, r.x, r.y, r.w, r.h); 
     XFlush(canvas_.d); // Maybe not needed?
-#endif
 }
 // ... code omitted ...
 XColor artist::to_xcolor(color c) const {
@@ -430,14 +407,14 @@ XColor artist::to_xcolor(color c) const {
 }
 ~~~
 
- > For demo purposes using XWindows drawing functions is fine, but in the future
- > we will use Pango/Cairo for painting. The aging XWindows simply lacks power
- > to support requirements of modern user interfaces. 
+ > We can live with XWindows drawing functions for now. But in the future
+ > we will use Pango/Cairo libraries as the aging XWindows lacks power
+ > to support requirements of a modern user interface. 
 
-# Test!
 
- And we are done. The X11 port test works. We can now execute this code on
- three systems: MS Windows, GTK (any system), and raw X11.
+# Done!
+
+That's it. We've ported nice to X11. And can now execute following code
 
  ~~~cpp
  #include "nice.hpp"
@@ -468,5 +445,9 @@ void program()
 }
  ~~~ 
 
- In next lesson (Lesson 5) we will add child controls, and crate
- a layout manager for our window.
+Thank you for your patience.
+
+In our next lesson (Lesson 5) we will add some child controls, and crate
+a cool layout manager. 
+
+Stay tuned.
