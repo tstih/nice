@@ -68,7 +68,11 @@ namespace ni {
     typedef Window wnd_instance;
     typedef int coord;
     typedef uint8_t byte;
-    typedef GC canvas;
+    typedef struct x11_canvas {
+        Display* d;
+        Window w;
+        GC gc;
+    } canvas;
 #endif
 
 
@@ -200,6 +204,12 @@ namespace ni {
             cairo_set_line_width(canvas_, 1);
             cairo_rectangle(canvas_, r.left + 0.5f, r.top + 0.5F, r.width, r.height );
             cairo_stroke(canvas_);
+#elif __X11__
+            XColor pix=to_xcolor(c);
+
+            XSetForeground(canvas_.d, canvas_.gc, pix.pixel);
+            XDrawRectangle(canvas_.d, canvas_.w, canvas_.gc, r.x, r.y, r.w, r.h); 
+            XFlush(canvas_.d); 
 #endif
         }
 
@@ -219,6 +229,8 @@ namespace ni {
         float normalize(int c, int max=255) const {
             return (float)c / (float) max;
         }
+#elif __X11__
+        XColor to_xcolor(color c) const;
 #endif
     };
 
@@ -585,15 +597,38 @@ namespace ni {
             created.emit();
             break;
         case ClientMessage:
-            Atom atom = XInternAtom ( app::instance(),
-                        "WM_DELETE_WINDOW",
-                        false );
-            if ( atom == e.xclient.data.l[0] )
-                destroyed.emit();
-                quit=true;
+            {
+                Atom atom = XInternAtom ( app::instance(),
+                            "WM_DELETE_WINDOW",
+                            false );
+                if ( atom == e.xclient.data.l[0] )
+                    destroyed.emit();
+                    quit=true;
+            }
             break;
+        case Expose:
+            {
+                canvas c { app::instance(), instance(), XCreateGC(app::instance(), instance(), 0, NULL) }; 
+                artist a(c);
+                paint.emit(a);
+                XFreeGC(app::instance(),c.gc);
+            }
+		    break;
         }
         return quit;
+    }
+
+    XColor artist::to_xcolor(color c) const {
+        XColor clr;
+        std::ostringstream sclr;
+        sclr << '#' << std::hex << std::setfill('0') << std::setw(2) << (int)c.r 
+            << std::setfill('0') << std::setw(2) << (int)c.g
+            << std::setfill('0') << std::setw(2) << (int)c.b;
+        auto colormap = XDefaultColormap(app::instance(), DefaultScreen(app::instance()));
+        const char* clr_name=sclr.str().c_str();
+        XParseColor(app::instance(), colormap, clr_name, &clr);
+        XAllocColor(app::instance(), colormap, &clr);
+        return clr;
     }
 #endif
 
