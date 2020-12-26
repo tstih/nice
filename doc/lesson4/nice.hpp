@@ -24,7 +24,6 @@ extern int main(int argc, char* argv[]);
 #include <sys/file.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
-
 #endif
 }
 #include <vector>
@@ -49,10 +48,6 @@ namespace ni {
     typedef HINSTANCE app_instance;
     typedef HWND wnd_instance;
     typedef LONG coord;
-    typedef UINT msg;
-    typedef WPARAM par1;
-    typedef LPARAM par2;
-    typedef LRESULT result;
     typedef BYTE byte;
     typedef HDC canvas;
 #elif __GTK__ 
@@ -286,7 +281,7 @@ namespace ni {
         }
 
         // Local callback. Specific to wnd.
-        virtual result local_wnd_proc(msg msg, par1 p1, par2 p2) {
+        virtual LRESULT local_wnd_proc(UINT msg, WPARAM p1, LPARAM p2) {
             switch (msg) {
             case WM_CREATE:
                 created.emit();

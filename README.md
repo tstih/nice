@@ -86,11 +86,14 @@ make
  * proof of concept: hello world
  * transformed into single header library
  * ms windows binding
- * unis binding (GTK3)
+ * refactoring no 1
+ * GTK3 binding
  * mapping window messages to C++ signals
+ * basic paint proof of concept
+ * refactoring no 2
+ * X11 binding
 
 ## Implementing
- * basic paint proof of concept
  * basic layout manager POC
  * scribble app
  * calculator app
@@ -111,7 +114,9 @@ Part 2: [Basic windows.](https://github.com/tstih/nice/tree/master/doc/lesson2)
 
 Part 3: [Window message routing, and painting.](https://github.com/tstih/nice/tree/master/doc/lesson3)
 
-Part 4: Child windows and layouting
+Part 4: [Porting nice to a new platform: X11](https://github.com/tstih/nice/tree/master/doc/lesson4)
+
+Part 5: Child windows and layouting
 
 Part 5: Custom Controls
 
