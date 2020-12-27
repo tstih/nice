@@ -115,7 +115,7 @@ Part 3: [Window message routing, and painting.](https://github.com/tstih/nice/tr
 
 Part 4: [Porting nice to a new platform: X11](https://github.com/tstih/nice/tree/master/doc/lesson4)
 
-Part 5: Child windows and layout managers
+Part 5: [Child windows and layout managers](https://github.com/tstih/nice/tree/master/doc/lesson5)
 
 Part 6: Adding a handful of common controls
 

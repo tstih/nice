@@ -133,3 +133,5 @@ protected:
  > In this lesson we will **not** be showing how to implement  all new 
  > properties (`wsize`, `title`, and `location`) and their events.  
  > One example is enough. If you want to understand others - read the code. 
+ 
+ ( ... to be continued ... )

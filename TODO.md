@@ -7,14 +7,13 @@ version: things that were forgoten or not tested enough.
 
 ## All environments
 
- * Test the functioning of the `wnd::destroy()` under 
-   various conditions
+ - [ ] Test the functioning of the `wnd::destroy()` under various conditions
 
 ## X Windows
 
- * Set window title when creating a window
- * Make the `created` event work
- * fill_rectangle is not implemented
+ - [x] Set window title when creating a window
+ - [ ] Make the `created` event work
+ - [ ] fill_rectangle is not implemented
 
 ## MS Windows
 
