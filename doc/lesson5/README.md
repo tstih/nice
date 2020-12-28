@@ -30,14 +30,14 @@ We will be able to write
 
 ~~~cpp
 w.title="Hello!";
-w.size={640,400};
+w.wsize={640,400};
 ~~~
 
 instead of
 
 ~~~cpp
 w.set_title("Hello!");
-w.set_size({640,400});
+w.set_wsize({640,400});
 ~~~
 
 Here's the class that enables us to define a property.
@@ -106,7 +106,40 @@ or `1.5_em`.
  > with any future standard library, literals without underscores
  > should only be defined by the standard library.
 
-# Handling window size 
+For now we'll define percent and pixel units. 
+
+~~~cpp
+class percent
+{
+    double percent_;
+
+public:
+    class pc {};
+    explicit constexpr percent(pc, double dpc) : percent_{ dpc } {}
+};
+
+constexpr percent operator "" _pc(long double dpc)
+{
+    return percent{ percent::pc{}, static_cast<double>(dpc) };
+}
+
+class pixel
+{
+    int pixel_;
+
+public:
+    class px {};
+    explicit constexpr pixel(px, int ipx) : pixel_{ ipx } {}
+    int value() { return pixel_; }
+};
+
+constexpr pixel operator "" _px(unsigned long long ipx)
+{
+    return pixel{ pixel::px{}, static_cast<int>(ipx) };
+}
+~~~
+
+# Handling window properties 
 
 Time to implement the size property, and the resized event.
 
@@ -134,4 +167,142 @@ protected:
  > properties (`wsize`, `title`, and `location`) and their events.  
  > One example is enough. If you want to understand others - read the code. 
  
- ( ... to be continued ... )
+# Handling more events
+
+Let's now add mouse, keyboard, and a few basic windows events (i.e. resize). 
+We are going to start with very simple structures for these events, and evolve 
+them as we go. The signals to add are: `key_press`, `key_release`, 
+`mouse_down`, `mouse_up`, `mouse_move`, and `resized`.
+
+## New events
+
+### Mouse events
+
+Following is the data structure for mouse events that we plan to pass with mouse
+signals. It contains current mouse position, the status of three mouse buttons,
+and the status of shift, control, and alt keys.
+
+~~~cpp
+struct mouse_info {
+    pt location;
+    bool left_button;
+    bool middle_button;
+    bool right_button;
+    bool ctrl;
+    bool shift;
+    bool alt;
+};
+
+class wnd : public resource<wnd_insance> {
+    // ... code omitted ...
+    signal<const mouse_info&> mouse_move;
+    signal<const mouse_info&> mouse_down;
+    signal<const mouse_info&> mouse_up;
+    // ... code omitted ...
+};
+~~~
+
+To emit these signals, we'll simply extend local window procedure for the `wnd`
+class for each platform. As we already explained event routing in earlier sessions,
+here's the code fragment routing mouse events on the MS Windows platform. 
+
+~~~cpp
+case WM_MOUSEMOVE:
+case WM_LBUTTONDOWN:
+case WM_MBUTTONDOWN:
+case WM_RBUTTONDOWN:
+case WM_LBUTTONUP:
+case WM_MBUTTONUP:
+case WM_RBUTTONUP:
+    {
+    // Populate the mouse info structure.
+    mouse_info mi = {
+        {GET_X_LPARAM(lparam),GET_Y_LPARAM(lparam)}, // point
+        wparam & MK_LBUTTON,
+        wparam & MK_MBUTTON,
+        wparam & MK_RBUTTON,
+        wparam & MK_CONTROL,
+        wparam & MK_SHIFT,
+        ::GetKeyState((VK_RMENU) & 0x8000) || ::GetKeyState((VK_LMENU) & 0x8000) // Right ALT or left ALT..doesn't work!!!
+    };
+    if (msg == WM_MOUSEMOVE)
+        mouse_move.emit(mi);
+    else if (msg == WM_LBUTTONDOWN || msg == WM_MBUTTONDOWN || msg == WM_RBUTTONDOWN)
+        mouse_down.emit(mi);
+    else
+        mouse_up.emit(mi);
+    }
+    break;
+~~~
+
+# Multiplatform Scrible
+
+Excellent. We now have enough functionality on window to implement **the
+Scrible**. 
+
+~~~cpp
+#include <vector>
+#include "nice.hpp"
+
+using namespace ni;
+
+class main_wnd : public app_wnd {
+public:
+    main_wnd() : app_wnd("Scrible", { 800,600 })
+    {
+        drawing_ = false;
+
+        paint.connect(this, &main_wnd::on_paint);
+        mouse_down.connect(this, &main_wnd::on_mouse_down);
+        mouse_up.connect(this, &main_wnd::on_mouse_up);
+        mouse_move.connect(this, &main_wnd::on_mouse_move);
+    }
+private:
+    std::vector<std::vector<pt>> strokes_;
+    bool drawing_;
+
+    bool on_paint(const artist& a) {
+        // No strokes to draw yet?
+        if (strokes_.size() == 0) return true;
+        for (auto s : strokes_) {
+            auto iter = s.begin(); // First point.
+            auto prev = *iter;
+            for (advance(iter, 1); iter != s.end(); ++iter)
+            {
+                auto p = *iter;
+                a.draw_line({ 0,0,0 }, prev, p);
+                prev = p;
+            }
+        }
+        return true;
+    }
+
+    bool on_mouse_down(const mouse_info& mi) {
+        drawing_ = true;
+        strokes_.push_back(std::vector<pt>());
+        strokes_.back().push_back(mi.location);
+        return true;
+    }
+
+    bool on_mouse_move(const mouse_info& mi) {
+        if (drawing_) {
+            strokes_.back().push_back(mi.location);
+            repaint();
+        }
+        return true;
+    }
+
+    bool on_mouse_up(const mouse_info& mi) {
+        drawing_ = false;
+        strokes_.back().push_back(mi.location);
+        repaint();
+        return true;
+    }
+};
+
+void program()
+{
+    app::run(main_wnd());
+}
+~~~
+

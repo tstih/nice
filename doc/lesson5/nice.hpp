@@ -15,6 +15,7 @@
 extern "C" {
 #if __WIN__
 #include <windows.h>
+#include <windowsx.h>
 #elif __GTK__
 #include <sys/file.h>
 #include <unistd.h>
@@ -42,6 +43,27 @@ extern int main(int argc, char* argv[]);
 #endif
 
 namespace ni {
+
+// ----- Nice exception(s). ---------------------------------------------------
+#define throw_ex(ex, what) \
+        throw ex(what, __FILE__,__FUNCTION__,__LINE__);
+
+    class nice_exception : public std::exception {
+    public:
+        nice_exception(
+            std::string what,
+            std::string file = nullptr,
+            std::string func = nullptr,
+            int line = 0) : what_(what), file_(file), func_(func), line_(line) {};
+        std::string what() { return what_; }
+    protected:
+        std::string what_;
+        std::string file_; // __FILE__
+        std::string func_; // __FUNCTION__
+        int line_; // __LINE__
+    };
+
+
 
 // ----- Unified types. -------------------------------------------------------
 #if __WIN__
@@ -102,7 +124,39 @@ namespace ni {
 
 
 
- // ----- Properties. ---------------------------------------------------------
+// ----- Units ---------------------------------------------------------------
+    class percent
+    {
+        double percent_;
+
+    public:
+        class pc {};
+        explicit constexpr percent(pc, double dpc) : percent_{ dpc } {}
+    };
+
+    constexpr percent operator "" _pc(long double dpc)
+    {
+        return percent{ percent::pc{}, static_cast<double>(dpc) };
+    }
+
+    class pixel
+    {
+        int pixel_;
+
+    public:
+        class px {};
+        explicit constexpr pixel(px, int ipx) : pixel_{ ipx } {}
+        int value() { return pixel_; }
+    };
+
+    constexpr pixel operator "" _px(unsigned long long ipx)
+    {
+        return pixel{ pixel::px{}, static_cast<int>(ipx) };
+    }
+
+
+
+// ----- Properties. ---------------------------------------------------------
     template<typename T>
     class property {
     public:
@@ -119,7 +173,7 @@ namespace ni {
 
 
 
- // ----- Signals. ------------------------------------------------------------
+// ----- Signals. ------------------------------------------------------------
     template <typename... Args>
     class signal {
     public:
@@ -205,6 +259,16 @@ namespace ni {
             canvas_ = canvas;
         }
 
+        // Draw a line.
+        void draw_line(color c, pt p1, pt p2) const {
+            HPEN pen = ::CreatePen(PS_SOLID, 1, RGB(c.r, c.g, c.b));
+            ::SelectObject(canvas_, pen);
+            POINT pt;
+            ::MoveToEx(canvas_, p1.x, p1.y, &pt);
+            ::LineTo(canvas_,p2.x,p2.y);
+            ::DeleteObject(pen);
+        }
+
         // Draw a rectangle.
         void draw_rect(color c, rct r) const {
 #if __WIN__
@@ -249,6 +313,22 @@ namespace ni {
 
 
 
+// ----- Window signal structures. --------------------------------------------
+    struct mouse_info {
+        pt location;
+        bool left_button;
+        bool middle_button;
+        bool right_button;
+        bool ctrl;
+        bool shift;
+        bool alt;
+    };
+
+    struct resized_info {
+        coord width;
+        coord height;
+    };
+
 // ----- Base window.  --------------------------------------------------------
 #if __X11__
     class wnd : public resource<wnd_instance, 0> {
@@ -259,6 +339,13 @@ namespace ni {
         virtual ~wnd() { destroy(); }
         virtual wnd_instance create() = 0;
         void destroy() noexcept override;
+
+        // Methods.
+        void repaint() {
+#if __WIN__
+            ::InvalidateRect(instance(), NULL, TRUE);
+#endif
+        }
 
         // Properties.
         property<std::string> title {
@@ -271,12 +358,20 @@ namespace ni {
             [this] () -> size {  return this->get_wsize(); }
         };
 
+        property<pt> location {
+            [this](pt p) { this->set_location(p); },
+                [this]() -> pt {  return this->get_location(); }
+        };
+
         // Events of basic window.
 #if __WIN__
         signal<> created;
         signal<> destroyed;
         signal<const artist&> paint;
-        signal<> resized;
+        signal<const resized_info&> resized;
+        signal<const mouse_info&> mouse_move;
+        signal<const mouse_info&> mouse_down;
+        signal<const mouse_info&> mouse_up;
 #elif __GTK__
         signal<> created;
         signal<> destroyed{ [this]() { ::g_signal_connect(G_OBJECT(instance()), "destroy", G_CALLBACK(wnd::global_gtk_destroy), this); } };
@@ -291,10 +386,12 @@ namespace ni {
     protected:
 
         // Setters and getters.
-        virtual std::string get_title() { return nullptr; }
+        virtual std::string get_title();
         virtual void set_title(std::string s);
-        virtual size get_wsize() {  return size{800,600}; } 
-        virtual void set_wsize(size sz) {}
+        virtual size get_wsize();
+        virtual void set_wsize(size sz);
+        virtual pt get_location();
+        virtual void set_location(pt location);
 
 #if __WIN__
         // Generic callback. Calls member callback.
@@ -320,7 +417,7 @@ namespace ni {
         }
 
         // Local callback. Specific to wnd.
-        virtual LRESULT local_wnd_proc(UINT msg, WPARAM p1, LPARAM p2) {
+        virtual LRESULT local_wnd_proc(UINT msg, WPARAM wparam, LPARAM lparam) {
             switch (msg) {
             case WM_CREATE:
                 created.emit();
@@ -328,17 +425,51 @@ namespace ni {
             case WM_DESTROY:
                 destroyed.emit();
                 break;
-            case WM_PAINT: // New paint handler!
-            {
+            case WM_PAINT: 
+                {
                 PAINTSTRUCT ps;
                 HDC hdc = BeginPaint(instance(), &ps);
                 artist a(hdc);
                 paint.emit(a);
                 EndPaint(instance(), &ps);
-            }
-            break;
+                }
+                break;
+            case WM_MOUSEMOVE:
+            case WM_LBUTTONDOWN:
+            case WM_MBUTTONDOWN:
+            case WM_RBUTTONDOWN:
+            case WM_LBUTTONUP:
+            case WM_MBUTTONUP:
+            case WM_RBUTTONUP:
+                {
+                // Populate the mouse info structure.
+                mouse_info mi = {
+                    {GET_X_LPARAM(lparam),GET_Y_LPARAM(lparam)}, // point
+                    wparam & MK_LBUTTON,
+                    wparam & MK_MBUTTON,
+                    wparam & MK_RBUTTON,
+                    wparam & MK_CONTROL,
+                    wparam & MK_SHIFT,
+                    ::GetKeyState((VK_RMENU) & 0x8000) || ::GetKeyState((VK_LMENU) & 0x8000) // Right ALT or left ALT..doesn't work!!!
+                };
+                if (msg == WM_MOUSEMOVE)
+                    mouse_move.emit(mi);
+                else if (msg == WM_LBUTTONDOWN || msg == WM_MBUTTONDOWN || msg == WM_RBUTTONDOWN)
+                    mouse_down.emit(mi);
+                else
+                    mouse_up.emit(mi);
+                }
+                break;
+            case WM_SIZE:
+                resized.emit(
+                    {
+                        LOWORD(lparam),
+                        HIWORD(lparam)
+                    }
+                );
+                break;
             default:
-                return ::DefWindowProc(instance(), msg, p1, p2);
+                return ::DefWindowProc(instance(), msg, wparam, lparam);
             }
             return 0;
         }
@@ -422,15 +553,14 @@ namespace ni {
 
         // Startup functions are our friends.
 #if __WIN__
-        friend int WINAPI WinMain(
+        friend int WINAPI ::WinMain(
             _In_ HINSTANCE hInstance,
             _In_opt_ HINSTANCE hPrevInstance,
             _In_ LPSTR lpCmdLine,
-            _In_ int nShowCmd)
+            _In_ int nShowCmd);
 #elif __GTK__ || __X11__
         friend int ::main(int argc, char* argv[]);
-#endif
-        
+#endif        
     };
 
     int app::ret_code = 0;
@@ -545,10 +675,73 @@ namespace ni {
 
 
 // ----- Deferred definitions (misc.) ----------------------------------------- 
-
     void wnd::set_title(std::string s) {
+#if __WIN__
+        ::SetWindowText(instance(),s.c_str());
+#elif __GTK__
+#elif __X11__
         ::XStoreName(app::instance(), instance(), s.c_str());
+#endif
     };
+    
+    std::string wnd::get_title() {
+#if __WIN__
+        TCHAR szTitle[1024];
+        GetWindowTextA(instance(), szTitle, 1024);
+        return std::string(szTitle);
+#elif __GTK__
+#elif __X11__
+        // XFetchName and XFree...
+#endif
+    }
+
+    size wnd::get_wsize() {
+#if __WIN__
+        RECT wr;
+        ::GetWindowRect(instance(), &wr);
+        return size{ wr.right-wr.left+1, wr.bottom-wr.top+1 };
+#elif __GTK__
+#elif __X11__
+        // XGetWindowAttributes
+#endif
+    }
+
+    void wnd::set_wsize(size sz) {
+#if __WIN__
+        // Use move.
+        RECT wr;
+        ::GetWindowRect(instance(), &wr);
+        ::MoveWindow(instance(), wr.left, wr.top, sz.w, sz.h, TRUE);
+#elif __GTK__
+#elif __X11__
+#endif
+    }
+
+    pt wnd::get_location() {
+#if __WIN__
+        RECT wr;
+        ::GetWindowRect(instance(), &wr);
+        return pt{ wr.left, wr.top };
+#elif __GTK__
+#elif __X11__
+#endif
+    }
+
+    void wnd::set_location(pt location) {
+#if __WIN__
+        // We need to keep the position and just change the size.
+        RECT wr;
+        ::GetWindowRect(instance(), &wr);
+        ::MoveWindow(instance(), 
+            location.left, 
+            location.top, 
+            wr.right-wr.left+1, 
+            wr.bottom-wr.top+1, TRUE);
+#elif __GTK__
+#elif __X11__
+#endif
+    }
+
 
     void wnd::destroy() noexcept {
 #if __WIN__

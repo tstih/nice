@@ -17,7 +17,7 @@ version: things that were forgoten or not tested enough.
 
 ## MS Windows
 
-Nothing.
+ - [ ] ALT key is not working in mouse events...
 
 ## GTK
 
