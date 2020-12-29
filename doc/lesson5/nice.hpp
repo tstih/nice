@@ -261,12 +261,14 @@ namespace ni {
 
         // Draw a line.
         void draw_line(color c, pt p1, pt p2) const {
+#if __WIN__
             HPEN pen = ::CreatePen(PS_SOLID, 1, RGB(c.r, c.g, c.b));
             ::SelectObject(canvas_, pen);
             POINT pt;
             ::MoveToEx(canvas_, p1.x, p1.y, &pt);
             ::LineTo(canvas_,p2.x,p2.y);
             ::DeleteObject(pen);
+#endif
         }
 
         // Draw a rectangle.
@@ -381,7 +383,10 @@ namespace ni {
         signal<> created;
         signal<> destroyed;
         signal<const artist&> paint;
-        signal<> resized;
+        signal<const resized_info&> resized;
+        signal<const mouse_info&> mouse_move;
+        signal<const mouse_info&> mouse_down;
+        signal<const mouse_info&> mouse_up;
 #endif
     protected:
 
@@ -847,7 +852,17 @@ namespace ni {
                 XFreeGC(app::instance(),c.gc);
             }
 		    break;
-        }
+        case ButtonPress: // https://tronche.com/gui/x/xlib/events/keyboard-pointer/keyboard-pointer.html
+            break;
+        case ButtonRelease:
+            break;
+        case MotionNotify:
+            break;
+        case KeyPress:
+            break;
+        case KeyRelease:
+            break;
+        } // switch
         return quit;
     }
 
