@@ -139,6 +139,76 @@ constexpr pixel operator "" _px(unsigned long long ipx)
 }
 ~~~
 
+# The value chain pattern
+
+In the GUI world, hierarchies are common. Window main menu is 
+a hierarchy (of menus and items. Child windows of a window, which 
+themselves can host more child windows, form a hierarchy.
+
+To handle hierarchies we need a nice programming interface. 
+Somthing readable and simple. Like this...
+
+~~~cpp
+main_menu 
+    << menu("File")
+        << (
+            mbutton("Open", &main_wnd::on_file_open)
+            << mbutton("Save", &main_wnd::on_file_save)
+            << mbutton("Save As...", &main_wnd::on_file_save_as)
+            << mseparator()
+            << mbutton("Close", &main_wnd::on_close)
+    <<  menu("Edit")
+        << (
+            mbutton("Cut", &main_wnd::on_edit_cut)
+            << mbutton("Copy", &main_wnd::on_edit_copy)
+            << mbutton("Paste", &main_wnd::on_edit_paste)
+        )
+    <<  menu("Help");
+        << (
+            mbutton("About", &main_wnd::on_help_about)
+        );
+~~~
+
+This chapter describes a programming pattern that enables 
+such hierarchies in C++. We call this the value chain pattern because
+we are building chains of stuff, passed by value.
+
+## The menu class
+
+Let's first create a simple menu class with a `<<` operator, which
+simply stores everytihing in a `children_` collection. 
+
+~~~cpp
+class menu {
+public:
+    template<class T>
+    T & operator << (T && child) { 
+        return std::forward<T&>(add(child));
+    }
+    template<class T>
+    T & operator << (T & child) { // Not the same as above! T&& vs T& 
+        return std::forward<T&>(add(child));
+    }
+protected:
+    template<class T>
+    T & add(T& child) {
+        std::unique_ptr<T> heap_chld=std::make_unique<T>();
+        *heap_chld=std::move(child); // Type sliced, but to correct type.
+        children_.push_back(std::unique_ptr<T>(std::move(heap_chld)));
+        return (T&)(*this);
+    }
+    std::vector<std::unique_ptr<menu>> children_;
+};
+~~~
+
+The important issue to understand here is that all values will be copied hence
+you can pass temporary objects.
+
+ > Disclaimer: we need to use templates due to object/type slicing. It is a non-trivial
+ > problem in C++ that you should understand but is beyond the scope of this lesson.
+
+
+
 # Handling window properties 
 
 Time to implement the size property, and the resized event.
@@ -306,3 +376,76 @@ void program()
 }
 ~~~
 
+# Child controls
+
+It's now time to add some child controls to our window. We're going to start
+with a menu, and then create a button and a label.
+
+# The Layout Manager
+
+## Adding child controls
+
+~~~cpp
+int main() {
+    auto l = layout();
+    auto hl = hlayout(); 
+    l << vlayout() 
+        << (
+            hlayout()
+            << hlayout() // Temporary.
+            << hl // Reference.
+        )
+        << hlayout();
+    l.display();
+    return 0;
+}
+~~~
+
+## Base layout class
+
+~~~cpp
+class layout {
+public:
+    virtual std::string me() { return "layout";}
+    virtual void display(int spaces=0) {
+        std::cout << std::string( spaces, ' ' ) << me() << std::endl;
+        for(auto &p : children_) p->display(spaces+3);
+    }
+
+    template<class T>
+    T & operator << (T && child) {
+        return std::forward<T&>(add(child));
+    }
+
+    template<class T>
+    T & operator << (T & child) {
+        return std::forward<T&>(add(child));
+    }
+
+private:
+    
+    template<class T>
+    T & add(T& child) {
+        std::unique_ptr<T> heap_chld=std::make_unique<T>();
+        *heap_chld=std::move(child); // Type sliced, but to correct type.
+        children_.push_back(std::unique_ptr<T>(std::move(heap_chld)));
+        return (T&)(*this);
+    }
+
+    std::vector<std::unique_ptr<layout>> children_;
+};
+~~~
+
+## Deriving layout classes
+
+~~~cpp
+class vlayout : public layout {
+public:
+    virtual std::string me() { return "vlayout";}
+};
+
+class hlayout : public layout {
+public:
+    virtual std::string me() { return "hlayout";}
+};
+~~~
