@@ -4,7 +4,7 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "cd build && cmake -DGTK=1 .. && make",
+            "command": "cd build && cmake -DMOTIF=1 .. && make",
             "problemMatcher": [
                 "$gcc"
             ],

@@ -15,9 +15,27 @@ elseif(X11)
     find_package(X11 REQUIRED)
     include_directories(${X11_INCLUDE_DIR})
     link_directories(${X11_LIBRARIES})
-    add_definitions(${GTK3_CFLAGS_OTHER})
     add_executable (lesson5 lesson5.cpp nice.hpp)   
     target_link_libraries(lesson5 ${X11_LIBRARIES})
+
+    # Debug version.
+    set(CMAKE_C_FLAGS_DEBUG "-g -DDEBUG")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG")
+    set(CMAKE_BUILD_TYPE Debug)
+
+elseif(MOTIF)
+    add_definitions(-D__MOTIF__)
+
+    find_package(X11 REQUIRED)
+    find_package(Motif REQUIRED)
+    
+    link_directories(${X11_LIBRARIES})
+    
+    include_directories(${X11_INCLUDE_DIR} ${MOTIF_INCLUDE_DIR})
+    
+    add_executable (lesson5 lesson5.cpp nice.hpp) 
+    
+    target_link_libraries(lesson5 ${X11_LIBRARIES} ${MOTIF_LIBRARIES} Xt X11)
 
     # Debug version.
     set(CMAKE_C_FLAGS_DEBUG "-g -DDEBUG")

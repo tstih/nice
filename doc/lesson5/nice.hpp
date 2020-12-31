@@ -13,19 +13,24 @@
 #define _NICE_HPP
 
 extern "C" {
-#if __WIN__
+#if __WIN__ 
 #include <windows.h>
 #include <windowsx.h>
-#elif __GTK__
+#elif __GTK__ 
 #include <sys/file.h>
 #include <unistd.h>
 #include <gtk/gtk.h>
 extern int main(int argc, char* argv[]);
-#elif __X11__
+#elif __X11__ 
 #include <sys/file.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#elif __MOTIF__ 
+#include <sys/file.h>
+#include <unistd.h>
+#include <Xm/Xm.h>
+#include <Xm/MainW.h>
 #endif
 }
 #include <vector>
@@ -36,7 +41,7 @@ extern int main(int argc, char* argv[]);
 
 extern void program();
 
-#if __GTK__|| __X11__
+#if __GTK__|| __X11__ || __MOTIF__
 extern "C" {
 extern int main(int argc, char* argv[]);
 } 
@@ -91,6 +96,16 @@ namespace ni {
         Window w;
         GC gc;
     } canvas;
+#elif __MOTIF__
+    typedef pid_t app_id;
+    typedef struct motif_app_instance {
+        XtAppContext app_context;
+        Widget app_shell;
+    } app_instance;
+    typedef Widget wnd_instance;
+    typedef int coord;
+    typedef uint8_t byte;
+    typedef int canvas; // TODO: change.
 #endif
 
 
@@ -387,6 +402,14 @@ namespace ni {
         signal<const mouse_info&> mouse_move;
         signal<const mouse_info&> mouse_down;
         signal<const mouse_info&> mouse_up;
+#elif __MOTIF__
+        signal<> created;
+        signal<> destroyed;
+        signal<const artist&> paint;
+        signal<const resized_info&> resized;
+        signal<const mouse_info&> mouse_move;
+        signal<const mouse_info&> mouse_down;
+        signal<const mouse_info&> mouse_up;
 #endif
     protected:
 
@@ -563,7 +586,7 @@ namespace ni {
             _In_opt_ HINSTANCE hPrevInstance,
             _In_ LPSTR lpCmdLine,
             _In_ int nShowCmd);
-#elif __GTK__ || __X11__
+#elif __GTK__ || __X11__ || __MOTIF__
         friend int ::main(int argc, char* argv[]);
 #endif        
     };
@@ -583,7 +606,7 @@ namespace ni {
     app_id app::id() {
 #if __WIN__
         return ::GetCurrentProcessId();
-#elif __GTK__ || __X11__
+#elif __GTK__ || __X11__ || __MOTIF__
         return ::getpid();
 #endif
     }
@@ -599,7 +622,7 @@ namespace ni {
             ::CreateMutex(0, FALSE, name.str().c_str());
             // We are primary instance.
             primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
-#elif __GTK__ || __X11__
+#elif __GTK__ || __X11__ || __MOTIF__
             // Pid file needs to go to /var/run
             std::ostringstream pfname, pid;
             pfname << "/tmp/" << aname << ".pid";
@@ -674,6 +697,13 @@ namespace ni {
 	      ::XNextEvent ( app::instance(),&e );
 	      quit = global_handle_x11_event(e);
 	    }
+
+#elif __MOTIF__
+        
+        XtManageChild (w.instance());
+        XtRealizeWidget (app::instance().app_shell);    
+        XtAppMainLoop (app::instance().app_context);
+
 #endif
     }
 
@@ -823,6 +853,13 @@ namespace ni {
         // Set initial title.
         XSetStandardProperties(app::instance(),w,title_.c_str(),NULL,None,NULL,0,NULL);
         return w;
+#elif __MOTIF__
+        // Make it non const.
+        char wname[title_.length() + 1];
+        strcpy(wname, title_.c_str());
+        Widget w=XmCreateMainWindow (app::instance().app_shell, wname, NULL, 0);   
+        XtManageChild (w);
+        return w;
 #endif
     }
 
@@ -905,6 +942,20 @@ int main(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
     // X Windows initialization code.
     ni::app::instance_=XOpenDisplay(NULL);
+#elif __MOTIF__
+int main(int argc, char* argv[]) {
+
+    ni::app::instance_.app_shell=XtVaOpenApplication (
+        &(ni::app::instance_.app_context), 
+        "App-Class", 
+        NULL, 
+        0, 
+        &argc,
+        argv, 
+        NULL, 
+        sessionShellWidgetClass, 
+        NULL); 
+
 #endif
     // Copy cmd line arguments to vector.
     ni::app::args = std::vector<std::string>(argv, argv + argc);
