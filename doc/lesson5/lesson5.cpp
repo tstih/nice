@@ -10,6 +10,8 @@ public:
     {
         drawing_ = false;
 
+        title="yo"; location={300,300}; wsize={400,100};
+
         paint.connect(this, &main_wnd::on_paint);
         mouse_down.connect(this, &main_wnd::on_mouse_down);
         mouse_up.connect(this, &main_wnd::on_mouse_up);

@@ -283,6 +283,10 @@ namespace ni {
             ::MoveToEx(canvas_, p1.x, p1.y, &pt);
             ::LineTo(canvas_,p2.x,p2.y);
             ::DeleteObject(pen);
+#elif __X11__
+            XColor pix=to_xcolor(c);
+            XSetForeground(canvas_.d, canvas_.gc, pix.pixel);
+            XDrawLine(canvas_.d, canvas_.w, canvas_.gc, p1.x, p1.y, p2.x, p2.y); 
 #endif
         }
 
@@ -300,10 +304,8 @@ namespace ni {
             cairo_stroke(canvas_);
 #elif __X11__
             XColor pix=to_xcolor(c);
-
             XSetForeground(canvas_.d, canvas_.gc, pix.pixel);
             XDrawRectangle(canvas_.d, canvas_.w, canvas_.gc, r.x, r.y, r.w, r.h); 
-            XFlush(canvas_.d); 
 #endif
         }
 
@@ -338,7 +340,6 @@ namespace ni {
         bool right_button;
         bool ctrl;
         bool shift;
-        bool alt;
     };
 
     struct resized_info {
@@ -358,11 +359,7 @@ namespace ni {
         void destroy() noexcept override;
 
         // Methods.
-        void repaint() {
-#if __WIN__
-            ::InvalidateRect(instance(), NULL, TRUE);
-#endif
-        }
+        void repaint ( void );
 
         // Properties.
         property<std::string> title {
@@ -478,8 +475,7 @@ namespace ni {
                     wparam & MK_RBUTTON,
                     wparam & MK_CONTROL,
                     wparam & MK_SHIFT,
-                    ::GetKeyState((VK_RMENU) & 0x8000) || ::GetKeyState((VK_LMENU) & 0x8000) // Right ALT or left ALT..doesn't work!!!
-                };
+                 };
                 if (msg == WM_MOUSEMOVE)
                     mouse_move.emit(mi);
                 else if (msg == WM_LBUTTONDOWN || msg == WM_MBUTTONDOWN || msg == WM_RBUTTONDOWN)
@@ -710,6 +706,15 @@ namespace ni {
 
 
 // ----- Deferred definitions (misc.) ----------------------------------------- 
+        void wnd::repaint() {
+#if __WIN__
+            ::InvalidateRect(instance(), NULL, TRUE);
+#elif __X11__
+            XClearArea(app::instance(), instance(), 0, 0, 1, 1, true);
+#endif
+        }
+
+
     void wnd::set_title(std::string s) {
 #if __WIN__
         ::SetWindowText(instance(),s.c_str());
@@ -749,6 +754,7 @@ namespace ni {
         ::MoveWindow(instance(), wr.left, wr.top, sz.w, sz.h, TRUE);
 #elif __GTK__
 #elif __X11__
+        XResizeWindow(app::instance(),instance(), sz.w, sz.h);
 #endif
     }
 
@@ -774,6 +780,7 @@ namespace ni {
             wr.bottom-wr.top+1, TRUE);
 #elif __GTK__
 #elif __X11__
+        XMoveWindow(app::instance(),instance(), location.left, location.top);
 #endif
     }
 
@@ -890,10 +897,34 @@ namespace ni {
             }
 		    break;
         case ButtonPress: // https://tronche.com/gui/x/xlib/events/keyboard-pointer/keyboard-pointer.html
-            break;
         case ButtonRelease:
+            {
+            mouse_info mi = {
+                { e.xmotion.x, e.xmotion.y },
+                e.xbutton.button&Button1, // lmrcsa
+                e.xbutton.button&Button2,
+                e.xbutton.button&Button3,
+                e.xbutton.state&ControlMask,
+                e.xbutton.state&ShiftMask
+            };
+            if (e.type==ButtonPress)
+                mouse_down.emit(mi);
+            else
+                mouse_up.emit(mi);
+            }
             break;
         case MotionNotify:
+            {
+            mouse_info mi = {
+                { e.xmotion.x, e.xmotion.y },
+                e.xmotion.state&Button1Mask, // lmrcsa
+                e.xmotion.state&Button2Mask,
+                e.xmotion.state&Button3Mask,
+                e.xmotion.state&ControlMask,
+                e.xmotion.state&ShiftMask
+            };
+            mouse_move.emit(mi);
+            }
             break;
         case KeyPress:
             break;
