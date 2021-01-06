@@ -91,16 +91,16 @@ make
  * basic paint proof of concept
  * refactoring no 2
  * X11 binding
+ * scribble app
 
 ## Implementing
  * basic layout manager POC
- * scribble app
  * calculator app
  * refactoring no 3
 
 ## Planning
  * custom controls
- * paint app
+ * improve painting, optimize performance
  * refactoring no 4
  * multithreading operations
 
@@ -115,13 +115,17 @@ Part 3: [Window message routing, and painting.](https://github.com/tstih/nice/tr
 
 Part 4: [Porting nice to a new platform: X11](https://github.com/tstih/nice/tree/master/doc/lesson4)
 
-Part 5: [Child windows and layout managers](https://github.com/tstih/nice/tree/master/doc/lesson5)
+Part 5: [The Scrible!](https://github.com/tstih/nice/tree/master/doc/lesson5)
 
-Part 6: Adding a handful of common controls
+Part 6: Child windows and layout managers
 
-Part 7: Custom Controls
+Part 7: Custom controls
 
-Part 8: It's all about being nice
+Part 8: Adding a handful of common controls
+
+Part 9: The style
+
+Part 10: At the end it's all about being nice
 
 
 # Bumps on the road

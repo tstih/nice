@@ -16,6 +16,7 @@ extern "C" {
 #if __WIN__ 
 #include <windows.h>
 #include <windowsx.h>
+#include <tchar.h>
 #elif __GTK__ 
 #include <sys/file.h>
 #include <unistd.h>
@@ -38,6 +39,7 @@ extern int main(int argc, char* argv[]);
 #include <sstream>
 #include <map>
 #include <functional>
+#include <memory>
 
 extern void program();
 
@@ -49,7 +51,7 @@ extern int main(int argc, char* argv[]);
 
 namespace ni {
 
-// ----- Nice exception(s). ---------------------------------------------------
+    // ----- Nice exception(s). ---------------------------------------------------
 #define throw_ex(ex, what) \
         throw ex(what, __FILE__,__FUNCTION__,__LINE__);
 
@@ -70,7 +72,7 @@ namespace ni {
 
 
 
-// ----- Unified types. -------------------------------------------------------
+    // ----- Unified types. -------------------------------------------------------
 #if __WIN__
     typedef DWORD  app_id;
     typedef HINSTANCE app_instance;
@@ -139,7 +141,7 @@ namespace ni {
 
 
 
-// ----- Units ---------------------------------------------------------------
+    // ----- Units ---------------------------------------------------------------
     class percent
     {
         double percent_;
@@ -171,16 +173,16 @@ namespace ni {
 
 
 
-// ----- Properties. ---------------------------------------------------------
+    // ----- Properties. ---------------------------------------------------------
     template<typename T>
     class property {
     public:
         property(
             std::function<void(T)> setter,
             std::function<T()> getter) :
-            setter_(setter),getter_(getter) { }
+            setter_(setter), getter_(getter) { }
         operator T() const { return getter_(); }
-        property<T>& operator= (const T &value) { setter_(value); return *this; }
+        property<T>& operator= (const T& value) { setter_(value); return *this; }
     private:
         std::function<void(T)> setter_;
         std::function<T()> getter_;
@@ -188,7 +190,7 @@ namespace ni {
 
 
 
-// ----- Signals. ------------------------------------------------------------
+    // ----- Signals. ------------------------------------------------------------
     template <typename... Args>
     class signal {
     public:
@@ -235,8 +237,8 @@ namespace ni {
 
 
 
-// ----- Two phase construction. ----------------------------------------------
-    template<typename T, T N=nullptr>
+    // ----- Two phase construction. ----------------------------------------------
+    template<typename T, T N = nullptr>
     class resource {
     public:
         // Create and destroy pattern.
@@ -250,7 +252,7 @@ namespace ni {
         virtual T instance() const {
             // Lazy evaluate by callign create.
             if (instance_ == N)
-                instance_ = const_cast<resource<T,N>*>(this)->create();
+                instance_ = const_cast<resource<T, N>*>(this)->create();
             // Return.
             return instance_;
         }
@@ -266,7 +268,7 @@ namespace ni {
 
 
 
-// ----- Graphics & painting. -------------------------------------------------
+    // ----- Graphics & painting. -------------------------------------------------
     class artist {
     public:
         // Pass canvas instance, don't own it.
@@ -281,12 +283,12 @@ namespace ni {
             ::SelectObject(canvas_, pen);
             POINT pt;
             ::MoveToEx(canvas_, p1.x, p1.y, &pt);
-            ::LineTo(canvas_,p2.x,p2.y);
+            ::LineTo(canvas_, p2.x, p2.y);
             ::DeleteObject(pen);
 #elif __X11__
-            XColor pix=to_xcolor(c);
+            XColor pix = to_xcolor(c);
             XSetForeground(canvas_.d, canvas_.gc, pix.pixel);
-            XDrawLine(canvas_.d, canvas_.w, canvas_.gc, p1.x, p1.y, p2.x, p2.y); 
+            XDrawLine(canvas_.d, canvas_.w, canvas_.gc, p1.x, p1.y, p2.x, p2.y);
 #endif
         }
 
@@ -300,12 +302,12 @@ namespace ni {
 #elif __GTK__
             cairo_set_source_rgb(canvas_, normalize(c.r), normalize(c.g), normalize(c.b));
             cairo_set_line_width(canvas_, 1);
-            cairo_rectangle(canvas_, r.left + 0.5f, r.top + 0.5F, r.width, r.height );
+            cairo_rectangle(canvas_, r.left + 0.5f, r.top + 0.5F, r.width, r.height);
             cairo_stroke(canvas_);
 #elif __X11__
-            XColor pix=to_xcolor(c);
+            XColor pix = to_xcolor(c);
             XSetForeground(canvas_.d, canvas_.gc, pix.pixel);
-            XDrawRectangle(canvas_.d, canvas_.w, canvas_.gc, r.x, r.y, r.w, r.h); 
+            XDrawRectangle(canvas_.d, canvas_.w, canvas_.gc, r.x, r.y, r.w, r.h);
 #endif
         }
 
@@ -315,15 +317,15 @@ namespace ni {
 #elif __GTK__
             cairo_set_source_rgb(canvas_, normalize(c.r), normalize(c.g), normalize(c.b));
             cairo_set_line_width(canvas_, 1);
-            cairo_rectangle(canvas_, r.left + 0.5f, r.top + 0.5F, r.width, r.height );
+            cairo_rectangle(canvas_, r.left + 0.5f, r.top + 0.5F, r.width, r.height);
             cairo_fill(canvas_);
 #endif
         }
     private:
         canvas canvas_;
 #ifdef __GTK__
-        float normalize(int c, int max=255) const {
-            return (float)c / (float) max;
+        float normalize(int c, int max = 255) const {
+            return (float)c / (float)max;
         }
 #elif __X11__
         XColor to_xcolor(color c) const;
@@ -332,7 +334,7 @@ namespace ni {
 
 
 
-// ----- Window signal structures. --------------------------------------------
+    // ----- Window signal structures. --------------------------------------------
     struct mouse_info {
         pt location;
         bool left_button;
@@ -347,7 +349,7 @@ namespace ni {
         coord height;
     };
 
-// ----- Base window.  --------------------------------------------------------
+    // ----- Base window.  --------------------------------------------------------
 #if __X11__
     class wnd : public resource<wnd_instance, 0> {
 #else
@@ -359,17 +361,17 @@ namespace ni {
         void destroy() noexcept override;
 
         // Methods.
-        void repaint ( void );
+        void repaint(void);
 
         // Properties.
         property<std::string> title {
-            [this] (std::string s) { this->set_title(s); },
-            [this] () -> std::string {  return this->get_title(); }
+            [this](std::string s) { this->set_title(s); },
+                [this]() -> std::string {  return this->get_title(); }
         };
 
         property<size> wsize {
-            [this] (size sz) { this->set_wsize(sz); },
-            [this] () -> size {  return this->get_wsize(); }
+            [this](size sz) { this->set_wsize(sz); },
+                [this]() -> size {  return this->get_wsize(); }
         };
 
         property<pt> location {
@@ -450,15 +452,15 @@ namespace ni {
             case WM_DESTROY:
                 destroyed.emit();
                 break;
-            case WM_PAINT: 
-                {
+            case WM_PAINT:
+            {
                 PAINTSTRUCT ps;
                 HDC hdc = BeginPaint(instance(), &ps);
                 artist a(hdc);
                 paint.emit(a);
                 EndPaint(instance(), &ps);
-                }
-                break;
+            }
+            break;
             case WM_MOUSEMOVE:
             case WM_LBUTTONDOWN:
             case WM_MBUTTONDOWN:
@@ -466,7 +468,7 @@ namespace ni {
             case WM_LBUTTONUP:
             case WM_MBUTTONUP:
             case WM_RBUTTONUP:
-                {
+            {
                 // Populate the mouse info structure.
                 mouse_info mi = {
                     {GET_X_LPARAM(lparam),GET_Y_LPARAM(lparam)}, // point
@@ -475,15 +477,15 @@ namespace ni {
                     wparam & MK_RBUTTON,
                     wparam & MK_CONTROL,
                     wparam & MK_SHIFT,
-                 };
+                };
                 if (msg == WM_MOUSEMOVE)
                     mouse_move.emit(mi);
                 else if (msg == WM_LBUTTONDOWN || msg == WM_MBUTTONDOWN || msg == WM_RBUTTONDOWN)
                     mouse_down.emit(mi);
                 else
                     mouse_up.emit(mi);
-                }
-                break;
+            }
+            break;
             case WM_SIZE:
                 resized.emit(
                     {
@@ -502,7 +504,7 @@ namespace ni {
             wnd* w = reinterpret_cast<wnd*>(data);
             w->destroyed.emit();
         }
-        static gboolean global_gtk_draw (GtkWidget *widget, cairo_t *cr, gpointer data)
+        static gboolean global_gtk_draw(GtkWidget* widget, cairo_t* cr, gpointer data)
         {
             wnd* w = reinterpret_cast<wnd*>(data);
             artist a(cr);
@@ -516,6 +518,62 @@ namespace ni {
     };
 
 
+    // ----- Application menu. ----------------------------------------------------
+    class menu_item {
+    public:
+        menu_item(std::string text=std::string()) : text_(text) {}
+        virtual std::string text() const { return text_; }
+    private:
+        std::string text_;
+    };
+
+    class menu : public menu_item {
+    public:
+        menu() : menu_item() {}
+
+        menu(std::string text) : menu_item(text) {}
+
+        template<class T>
+        const menu& operator << (const T& m) const {
+            add(m);
+            return *this;
+        }
+
+        std::vector<std::shared_ptr<menu_item>> children() const { return children_; }
+
+    private:
+        
+        template<class T>
+        void add(const T& child) const {
+            std::shared_ptr<T> heap_chld = std::make_shared<T>();
+            *heap_chld = std::move(child); // Type sliced, but to correct type.
+            children_.push_back(heap_chld);
+        }
+        mutable std::vector<std::shared_ptr<menu_item>> children_;
+    };
+
+    class menu_command : public menu_item{
+    public:
+        menu_command() : menu_item() {}
+        menu_command(std::string text) : menu_item (text) {}
+
+        template<typename T>
+        menu_command(std::string text, T* t, void (T::* func)()) : menu_item(text) {
+            func_=[=] { (t->*func)();  };
+        }
+
+        void exec() { func_(); }
+
+    private:
+        std::function<void()> func_;
+    };
+
+    class menu_separator : public menu_item{
+    public:
+        menu_separator() : menu_item (std::string()) {}
+    };
+
+
 
 // ----- Application window. --------------------------------------------------
     class app_wnd : public wnd {
@@ -526,7 +584,55 @@ namespace ni {
             // Subscribe to destroy signal.
             destroyed.connect(this, &app_wnd::on_destroy);
         }
+
         wnd_instance create() override;
+
+        void set_menu(const menu& wm) const {
+            int menu_id = 100; // First menu id.
+            HMENU main_menu = ::CreateMenu();
+            for (const std::shared_ptr<menu_item> m : wm.children()) {
+                append(main_menu, m, menu_id);
+            }
+            ::SetMenu(instance(), main_menu);
+        }
+
+        void append(HMENU hm, const std::shared_ptr<menu_item> m, int & menu_id) const {
+
+            std::shared_ptr<menu> mcontainer = std::dynamic_pointer_cast<menu> (m);
+
+            if (mcontainer == nullptr) // Not a submenu.
+            {
+                std::shared_ptr<menu_command> mcmd = std::dynamic_pointer_cast<menu_command> (m);
+                if (mcmd==nullptr)
+                    ::AppendMenu(hm, MF_SEPARATOR, 0, NULL);
+                else {
+                    ::AppendMenu(hm, MF_STRING, menu_id, m->text().c_str());
+                    menu_map_.insert(std::make_pair(menu_id, mcmd));
+                    menu_id++; // Consume the id.
+                }
+            }
+            else {
+                HMENU sub = CreateMenu();
+                ::AppendMenu(hm, MF_POPUP, (UINT_PTR)sub, mcontainer->text().c_str());
+                for (const auto& sm : mcontainer->children())
+                    append(sub, sm, ++menu_id);
+            }
+        }
+
+    protected:
+        mutable std::map<int, std::shared_ptr<menu_command>> menu_map_;
+
+        LRESULT local_wnd_proc(UINT msg, WPARAM wparam, LPARAM lparam) override {
+            if (msg == WM_COMMAND) {
+
+                std::shared_ptr<menu_command> cmd = menu_map_[LOWORD(wparam)];
+                cmd->exec();
+                return 0;
+            }
+            else
+                return wnd::local_wnd_proc(msg, wparam, lparam);
+        }
+
     private:
         std::string title_;
         size size_;
@@ -545,6 +651,32 @@ namespace ni {
         }            
     };
 
+
+
+
+// ----- Button control. -----------------------------------------------------
+    class button : public wnd {
+    public:
+        button(std::string text) : wnd(), text_(text) {
+        }
+        signal<> clicked;
+        wnd_instance create() override;
+    private:
+        std::string text_;
+    };
+
+
+
+
+// ----- Label control. ------------------------------------------------------
+    class label : public wnd {
+    public:
+        label(std::string text) : wnd(), text_(text) {
+        }
+        wnd_instance create() override;
+    private:
+        std::string text_;
+    };
 
 
 // ----- Application. ---------------------------------------------------------
@@ -947,6 +1079,29 @@ namespace ni {
         return clr;
     }
 #endif
+
+    wnd_instance button::create() {
+#if __WIN__
+        // Create it.
+        HWND hwnd = ::CreateWindow(
+            _T("BUTTON"),
+            text_.c_str(),
+            WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+            0,
+            0,
+            96,
+            26,
+            HWND_MESSAGE, // Start as message only window.
+            NULL,
+            app::instance(),
+            this);
+
+        if (!hwnd)
+            throw_ex(nice_exception, "Unable to create button.");
+#endif
+        return hwnd;
+    }
+
 
 } // namespace
 

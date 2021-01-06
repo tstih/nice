@@ -1,9 +1,6 @@
-# It's nice to have children
+# The Scrible!
 
-They say children are our greatest treasure. This lesson 
-is dedicated to managing children and keeping them in order.
-In it we will create a layout manager that will handle two 
-child controls (a button and a label).
+*For Microsoft Windows, MOTIF, GTK and XWindows!*
 
 # Extend the window class
 
@@ -94,11 +91,11 @@ If we want to override it, we override the protected getter and/or setter.
 
 # The unit pattern
 
-Our layout manager, and text output will both require 
-handling different units, such as percents, pixels, ems, etc. 
-A nice solution to this is using [user-defined literals](https://www.geeksforgeeks.org/user-defined-literals-cpp/), which have been around since C++11. 
-User defined literals will allow us to write quantities, such as `50_pc`, `200_px`,
-or `1.5_em`.
+Our text output will eventually require handling different units, 
+such as points, inches,  pixels, ems, etc. A nice solution to this 
+is using [user-defined literals](https://www.geeksforgeeks.org/user-defined-literals-cpp/), 
+which have been around since C++11. User defined literals will allow us to write quantities, 
+such as `50_pc`, `200_px`, or `1.5_em`.
 
  > Why the underscore? Wouldn't it look better if we define 
  > without it ie.. `50pc`,`200px`, and `1.5em`? It most
@@ -141,72 +138,113 @@ constexpr pixel operator "" _px(unsigned long long ipx)
 
 # The value chain pattern
 
-In the GUI world, hierarchies are common. Window main menu is 
-a hierarchy (of menus and items. Child windows of a window, which 
-themselves can host more child windows, form a hierarchy.
+In the GUI world, hierarchies are common. For example - the main menu 
+is a hierarchy. Child windows of a window, which themselves can host additional 
+child windows, also make a hierarchy.
 
-To handle hierarchies we need a nice programming interface. 
-Somthing readable and simple. Like this...
+Expressing such hierarchies in code should be intuitive enough to be understood 
+by the programmer when he or she sees it for the first time!
+
+A natural way to express hierarchies in C++ is by combining parentheses,
+and any left to right associative binary operator. Parentheses
+help us group children together, and left to right associative operator
+helps us attach grouped children with a parent. 
+
+Let's see how this works in practice. 
 
 ~~~cpp
-main_menu 
-    << menu("File")
-        << (
-            mbutton("Open", &main_wnd::on_file_open)
-            << mbutton("Save", &main_wnd::on_file_save)
-            << mbutton("Save As...", &main_wnd::on_file_save_as)
-            << mseparator()
-            << mbutton("Close", &main_wnd::on_close)
-    <<  menu("Edit")
-        << (
-            mbutton("Cut", &main_wnd::on_edit_cut)
-            << mbutton("Copy", &main_wnd::on_edit_copy)
-            << mbutton("Paste", &main_wnd::on_edit_paste)
+auto main_menu = menu()
+    << ( menu("File")
+        << menu_command("New", this, &main_wnd::on_file_new)
         )
-    <<  menu("Help");
-        << (
-            mbutton("About", &main_wnd::on_help_about)
+    << ( menu("Edit")
+        << menu_command("Red", this, &main_wnd::on_edit_red)
+        << menu_command("Green", this, &main_wnd::on_edit_green)
+        << menu_command("Blue", this, &main_wnd::on_edit_blue)
+        << menu_separator()
+        << menu_command("Black", this, &main_wnd::on_edit_black)
         );
+set_menu(main_menu);
 ~~~
 
-This chapter describes a programming pattern that enables 
-such hierarchies in C++. We call this the value chain pattern because
-we are building chains of stuff, passed by value.
+You don't need an explanation of the above code to understand it. Now let's
+create classes `menu`, `menu_command`, and the operator `<<` so that 
+we can actually do this! 
+
+ > We call this the value chain pattern because we are building chains of stuff, 
+ > passed by value.
 
 ## The menu class
 
-Let's first create a simple menu class with a `<<` operator, which
-simply stores everytihing in a `children_` collection. 
+Let's first create a basic menu item class. It has text which is displayed
+to the user. And if it is not provided, default is empty string. Two examples
+of menu items that do not need the text are: 1) a separator and 2) a root menu item.
 
 ~~~cpp
-class menu {
+class menu_item {
 public:
-    template<class T>
-    T & operator << (T && child) { 
-        return std::forward<T&>(add(child));
-    }
-    template<class T>
-    T & operator << (T & child) { // Not the same as above! T&& vs T& 
-        return std::forward<T&>(add(child));
-    }
-protected:
-    template<class T>
-    T & add(T& child) {
-        std::unique_ptr<T> heap_chld=std::make_unique<T>();
-        *heap_chld=std::move(child); // Type sliced, but to correct type.
-        children_.push_back(std::unique_ptr<T>(std::move(heap_chld)));
-        return (T&)(*this);
-    }
-    std::vector<std::unique_ptr<menu>> children_;
+    menu_item(std::string text=std::string()) : text_(text) {}
+    virtual std::string text() const { return text_; }
+private:
+    std::string text_;
 };
 ~~~
 
-The important issue to understand here is that all values will be copied hence
-you can pass temporary objects.
+Now let's derive a menu from this class.
 
- > Disclaimer: we need to use templates due to object/type slicing. It is a non-trivial
- > problem in C++ that you should understand but is beyond the scope of this lesson.
+~~~cpp
+class menu : public menu_item {
+public:
+    menu() : menu_item() {}
+    menu(std::string text) : menu_item(text) {}
+    template<class T>
+    const menu& operator << (const T& m) const {
+        add(m);
+        return *this;
+    }
+    std::vector<std::shared_ptr<menu_item>> children() const { return children_; }
+private:
+    template<class T>
+    void add(const T& child) const {
+        std::shared_ptr<T> heap_chld = std::make_shared<T>();
+        *heap_chld = std::move(child); // Type sliced, but to correct type.
+        children_.push_back(heap_chld);
+    }
+    mutable std::vector<std::shared_ptr<menu_item>> children_;
+};
+~~~
 
+We added the operator `<<` which adds whatever is on the right side of it
+to the menu children. It is a template function because we are allowing 
+passing temporary C++ objects and we need to make a copy of them to store
+them into our `children_` vector. If we made a copy by value i.e. without 
+a template, the value would be [object sliced](https://en.wikipedia.org/wiki/Object_slicing). 
+
+Our job is almost done. All that we need to do is create two derivate
+structures for menu command and a separator.
+
+~~~cpp
+class menu_command : public menu_item{
+public:
+    menu_command() : menu_item() {}
+    menu_command(std::string text) : menu_item (text) {}
+    template<typename T>
+    menu_command(std::string text, T* t, void (T::* func)()) : menu_item(text) {
+        func_=[=] { (t->*func)();  };
+    }
+    void exec() { func_(); }
+private:
+    std::function<void()> func_;
+};
+
+class menu_separator : public menu_item{
+public:
+    menu_separator() : menu_item (std::string()) {}
+};
+~~~
+
+The `menu_command` accepts a handler function which it calls if the
+command is selected by the user. 
 
 
 # Handling window properties 
@@ -312,6 +350,7 @@ Scrible**.
 
 ~~~cpp
 #include <vector>
+
 #include "nice.hpp"
 
 using namespace ni;
@@ -321,6 +360,21 @@ public:
     main_wnd() : app_wnd("Scrible", { 800,600 })
     {
         drawing_ = false;
+        ink_ = color{ 0,0,0 };
+
+        menu main_menu = menu()
+            << ( menu("File")
+                << menu_command("New", this, &main_wnd::on_file_new)
+                )
+            << ( menu("Edit")
+                << menu_command("Red", this, &main_wnd::on_edit_red)
+                << menu_command("Green", this, &main_wnd::on_edit_green)
+                << menu_command("Blue", this, &main_wnd::on_edit_blue)
+                << menu_separator()
+                << menu_command("Black", this, &main_wnd::on_edit_black)
+                );
+
+        set_menu(main_menu);
 
         paint.connect(this, &main_wnd::on_paint);
         mouse_down.connect(this, &main_wnd::on_mouse_down);
@@ -328,19 +382,56 @@ public:
         mouse_move.connect(this, &main_wnd::on_mouse_move);
     }
 private:
-    std::vector<std::vector<pt>> strokes_;
+
+    class stroke {
+    public:
+        pt p;
+        color c;
+    };
+
+    std::vector<std::vector<stroke>> strokes_;
     bool drawing_;
+    color ink_;
+
+    void on_file_new() {
+        strokes_.clear();
+        repaint();
+    }
+
+    void on_edit_red() {
+        ink_ = color{ 255,0,0 };
+        repaint();
+    }
+
+    void on_edit_green() {
+        ink_ = color{ 0,255,0 };
+        repaint();
+    }
+
+    void on_edit_blue() {
+        ink_ = color{ 0,0,255 };
+        repaint();
+    }
+
+    void on_edit_black() {
+        ink_ = color{ 0,0,0 };
+        repaint();
+    }
 
     bool on_paint(const artist& a) {
         // No strokes to draw yet?
-        if (strokes_.size() == 0) return true;
+        if (strokes_.size() == 0) {
+            // Clean background.
+
+            return true;
+        };
         for (auto s : strokes_) {
             auto iter = s.begin(); // First point.
             auto prev = *iter;
             for (advance(iter, 1); iter != s.end(); ++iter)
             {
                 auto p = *iter;
-                a.draw_line({ 0,0,0 }, prev, p);
+                a.draw_line(p.c, prev.p, p.p);
                 prev = p;
             }
         }
@@ -349,14 +440,14 @@ private:
 
     bool on_mouse_down(const mouse_info& mi) {
         drawing_ = true;
-        strokes_.push_back(std::vector<pt>());
-        strokes_.back().push_back(mi.location);
+        strokes_.push_back(std::vector<stroke>());
+        strokes_.back().push_back({ mi.location, ink_ });
         return true;
     }
 
     bool on_mouse_move(const mouse_info& mi) {
         if (drawing_) {
-            strokes_.back().push_back(mi.location);
+            strokes_.back().push_back({ mi.location, ink_ });
             repaint();
         }
         return true;
@@ -364,7 +455,7 @@ private:
 
     bool on_mouse_up(const mouse_info& mi) {
         drawing_ = false;
-        strokes_.back().push_back(mi.location);
+        strokes_.back().push_back({ mi.location, ink_ });
         repaint();
         return true;
     }
@@ -374,78 +465,4 @@ void program()
 {
     app::run(main_wnd());
 }
-~~~
-
-# Child controls
-
-It's now time to add some child controls to our window. We're going to start
-with a menu, and then create a button and a label.
-
-# The Layout Manager
-
-## Adding child controls
-
-~~~cpp
-int main() {
-    auto l = layout();
-    auto hl = hlayout(); 
-    l << vlayout() 
-        << (
-            hlayout()
-            << hlayout() // Temporary.
-            << hl // Reference.
-        )
-        << hlayout();
-    l.display();
-    return 0;
-}
-~~~
-
-## Base layout class
-
-~~~cpp
-class layout {
-public:
-    virtual std::string me() { return "layout";}
-    virtual void display(int spaces=0) {
-        std::cout << std::string( spaces, ' ' ) << me() << std::endl;
-        for(auto &p : children_) p->display(spaces+3);
-    }
-
-    template<class T>
-    T & operator << (T && child) {
-        return std::forward<T&>(add(child));
-    }
-
-    template<class T>
-    T & operator << (T & child) {
-        return std::forward<T&>(add(child));
-    }
-
-private:
-    
-    template<class T>
-    T & add(T& child) {
-        std::unique_ptr<T> heap_chld=std::make_unique<T>();
-        *heap_chld=std::move(child); // Type sliced, but to correct type.
-        children_.push_back(std::unique_ptr<T>(std::move(heap_chld)));
-        return (T&)(*this);
-    }
-
-    std::vector<std::unique_ptr<layout>> children_;
-};
-~~~
-
-## Deriving layout classes
-
-~~~cpp
-class vlayout : public layout {
-public:
-    virtual std::string me() { return "vlayout";}
-};
-
-class hlayout : public layout {
-public:
-    virtual std::string me() { return "hlayout";}
-};
 ~~~
