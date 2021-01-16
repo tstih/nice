@@ -2,7 +2,7 @@
 
 #include "nice.hpp"
 
-using namespace ni;
+using namespace nice;
 
 class main_wnd : public app_wnd {
 public:

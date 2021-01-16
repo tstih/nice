@@ -61,6 +61,18 @@ void program()
 }
 ~~~
 
+# Caveat!
+
+On unix nice namespace unfortunately conflicts with the `nice()` system function 
+so if you plan to use it you need to redefine it.
+
+~~~cpp
+#define nice _nice
+#include <>
+#undef nice
+~~~
+
+and use the following system call `_nice()`.
 
 # Compiling
 
