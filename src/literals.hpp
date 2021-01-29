@@ -13,7 +13,7 @@
 
 namespace nice {
 
-//{{BEGIN.DECL}}
+//{{BEGIN.DEC}}
    class percent
     {
         double percent_;
@@ -30,7 +30,7 @@ namespace nice {
         explicit constexpr pixel(px, int ipx) : pixel_{ ipx } {}
         int value() { return pixel_; }
     };
-//{{END.DECL}}
+//{{END.DEC}}
 
 //{{BEGIN.DEF}}
     constexpr percent operator "" _pc(long double dpc)

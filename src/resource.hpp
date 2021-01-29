@@ -13,7 +13,7 @@
 
 namespace nice {
 
-//{{BEGIN.DECL}}
+//{{BEGIN.DEC}}
     template<typename T, T N = nullptr>
     class resource {
     public:
@@ -41,7 +41,7 @@ namespace nice {
         // Store resource value here.
         mutable T instance_{ N };
     };
-//{{END.DECL}}
+//{{END.DEC}}
 
 }
 

@@ -15,7 +15,7 @@
 
 namespace nice {
 
-//{{BEGIN.DECL}}
+//{{BEGIN.DEC}}
 #define throw_ex(ex, what) \
         throw ex(what, __FILE__,__FUNCTION__,__LINE__);
 
@@ -33,7 +33,7 @@ namespace nice {
         std::string func_; // __FUNCTION__
         int line_; // __LINE__
     };
-//{{END.DECL}}
+//{{END.DEC}}
 
 }
 

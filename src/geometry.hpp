@@ -14,7 +14,7 @@
 
 namespace nice {
 
-//{{BEGIN.DECL}}
+//{{BEGIN.DEC}}
     typedef struct size_s {
         union { coord width; coord w; };
         union { coord height; coord h; };
@@ -40,7 +40,7 @@ namespace nice {
         coord x2() { return left + width; }
         coord y2() { return top + height; }
     } rct;
-//{{END.DECL}}
+//{{END.DEC}}
 
 }
 

@@ -13,7 +13,7 @@
 
 namespace nice {
 
-//{{BEGIN.DECL}}
+//{{BEGIN.DEC}}
     template <typename... Args>
     class signal {
     public:
@@ -57,7 +57,7 @@ namespace nice {
         mutable bool initialized_{ false };
         std::function<void()> init_{ nullptr };
     };
-//{{END.DECL}}
+//{{END.DEC}}
 
 }
 

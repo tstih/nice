@@ -23,7 +23,33 @@ void to_upper(std::string& s) {
 }
 
 std::string extract(const fs::path& path, const std::string& fname, const std::string &tag) {
-    return std::string();
+    
+    // Output stream.
+    std::stringstream os;
+
+    // Begin and end tag.
+    std::string btag="//{{BEGIN." + tag + "}}";
+    std::string etag="//{{END." + tag + "}}";
+
+    fs::path pfull=path / fname;
+    std::ifstream fle(pfull);
+    std::string line;
+    bool inside=false;
+
+    while(std::getline(fle, line))
+    {
+        // sm include directive?
+        if (line.rfind(btag, 0) == 0) 
+            inside=true;
+        else if (line.rfind(etag, 0) == 0)
+            inside=false;
+        else if (inside)
+            os << line << std::endl; // Just dump it.
+    }
+
+    fle.close();
+
+    return os.str();
 }
 
 std::string evaluate(const fs::path& root, std::string line, int n) {
@@ -66,7 +92,7 @@ std::string evaluate(const fs::path& root, std::string line, int n) {
                 } 
             }
         } 
-        os << "#endif" << std::endl;
+        os << "#endif";
     } else if (card=="1") {
         // Iterate files.
         for (const auto& f : fs::directory_iterator(p)) {

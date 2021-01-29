@@ -14,7 +14,7 @@
 
 #include "includes.hpp"
 
-//{{BEGIN.DECL}}
+//{{BEGIN.DEC}}
 namespace nice {
 
     // Unix process id.
@@ -42,6 +42,6 @@ namespace nice {
     } canvas;
 
 }
-//{{END.DECL}}
+//{{END.DEC}}
 
 #endif // _TYPES_HPP

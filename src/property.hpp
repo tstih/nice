@@ -15,7 +15,7 @@
 
 namespace nice {
 
-//{{BEGIN.DECL}}
+//{{BEGIN.DEC}}
     template<typename T>
     class property {
     public:
@@ -29,7 +29,7 @@ namespace nice {
         std::function<void(T)> setter_;
         std::function<T()> getter_;
     };
-//{{END.DECL}}
+//{{END.DEC}}
 
 }
 

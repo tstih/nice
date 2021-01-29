@@ -13,7 +13,7 @@
 
 #include "includes.hpp"
 
-//{{BEGIN.DECL}}
+//{{BEGIN.DEC}}
 namespace nice {
 
     // Mapped to Win32 process id.
@@ -35,6 +35,6 @@ namespace nice {
     typedef HDC canvas;
 
 }
-//{{END.DECL}}
+//{{END.DEC}}
 
 #endif // _TYPES_HPP
