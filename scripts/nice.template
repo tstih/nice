@@ -1,0 +1,31 @@
+/*
+ * nice.hpp
+ * 
+ * (Single) header file for the nice GUI library.
+ * 
+ * (c) 2020 Tomaz Stih
+ * This code is licensed under MIT license (see LICENSE.txt for details).
+ * 
+ * 18.12.2020   tstih
+ * 
+ */
+#ifndef _NICE_HPP
+#define _NICE_HPP
+
+{{$INCLUDE INC N native}}
+{{$INCLUDE INC 1}}
+
+namespace nice {
+
+{{$INCLUDE TYP N native}}
+{{$INCLUDE TYP 1}}
+
+{{$INCLUDE DEC 1}}
+{{$INCLUDE DEC N native}}
+
+{{$INCLUDE DEF 1}}
+{{$INCLUDE DEF N native}}
+
+}
+
+#endif // _NICE_HPP

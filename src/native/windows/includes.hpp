@@ -9,6 +9,8 @@
 // 16.01.2020   tstih
 // 
 
+//{{BEGIN.INC}}
 extern "C" {
 #include <windows.h>
 }
+//{{END.INC}}

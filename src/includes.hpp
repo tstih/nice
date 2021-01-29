@@ -9,6 +9,8 @@
 // 16.01.2020   tstih
 // 
 
+//{{BEGIN.INC}}
 #include <exception>
 #include <string>
 #include <functional>
+//{{END.INC}}
