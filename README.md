@@ -19,7 +19,7 @@ The philosophy of nice is to:
  * support modern layout managers
  * superfast, and supersmall; load instantly and use kilobytes, not megabytes!
  * single exe
- * be multiplatform.
+ * multiplatform.
 
 # Hello nice
 
@@ -28,11 +28,9 @@ Here's the Hello World application in nice:
 ~~~cpp
 #include "nice.hpp"
 
-using namespace ni;
-
 void program()
 {
-    app::run(app_wnd("Hello World!"));
+    nice::app::run(app_wnd("Hello World!"));
 }
 ~~~
 
@@ -41,23 +39,21 @@ And here's the Hello Paint application in nice:
 ~~~cpp
 #include "nice.hpp"
 
-using namespace ni;
-
-class main_wnd : public app_wnd {
+class main_wnd : public nice::app_wnd {
 public:
     main_wnd() : app_wnd("Hello paint!") {
         paint.connect(this, &main_wnd::on_paint);
     }
 private:
     // Paint handler, draws rectangle.
-    void on_paint(const artist& a) {
+    void on_paint(const nice::artist& a) {
         a.draw_rect({ 255,0,0 }, { 10,10,100,100 });
     }
 };
 
 void program()
 {
-    app::run(main_wnd());
+    nice::app::run(main_wnd());
 }
 ~~~
 

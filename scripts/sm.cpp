@@ -4,10 +4,11 @@
 #include <fstream>
 #include <filesystem>
 #include <sstream>
+#include <regex>
 
 namespace fs=std::filesystem;
 
-enum errors { success=0, no_args, no_template, no_dir, parse_error};
+enum errors { success=0, no_args, no_template, no_dir, parse_error, no_file};
 
 void error(std::string text, int code) {
     std::cerr << text << std::endl;
@@ -51,6 +52,8 @@ std::string extract(const fs::path& path, const std::string& fname, const std::s
     return os.str();
 }
 
+
+
 std::string evaluate(const fs::path& root, std::string line, int n) {
 
     // Output stream.
@@ -62,46 +65,25 @@ std::string evaluate(const fs::path& root, std::string line, int n) {
 
     // Tag at 11.
     std::string tag = line.substr(11,3); 
-    // Cardinality at 15.
-    std::string card = line.substr(15,1);
-    // From 17 to }} is folder.
-    std::string path = line.substr(17, line.rfind("}}")-17);
-    if (path=="}" || path==".") path=std::string(); // Empty? i.e no space before }} or .}}
+    // From 15 to }} is filename.
+    std::string pathstr = line.substr(15, line.rfind("}}")-15);
+    if (pathstr=="}") 
+        error("Empty path is not allowed in temmplate", no_dir);
+    
+    // Add path to our path string.
+    fs::path path = root / pathstr;
+    if (!path.has_filename()) 
+        error("Filename or *.ext must be part of the path", no_file);
 
-    // Now iterate through all files and extract by tags...
-    fs::path p = path.empty() ? root : root / path;
-    if (card=="N") {
-        // Iterate folders.
-        bool first=true;
-        for (const auto& e : fs::directory_iterator(p)) {
-            const auto name = e.path().filename().string();
-            std::string uname=name; to_upper(uname);
-            if (first) { 
-                os << "#if (__" << uname << "__)" << std::endl;
-                first=false;
-            } else
-                os << "#elif (__" << uname << "__)" << std::endl;
-            if (e.is_directory()) {
-                fs::path pfull=p / name;
-                for (const auto& f : fs::directory_iterator(pfull)) {
-                    const auto fname = f.path().filename().string();
-                    if (f.is_regular_file()) {
-                        os << extract(pfull, fname, tag);
-                    }
-                } 
-            }
-        } 
-        os << "#endif";
-    } else if (card=="1") {
-        // Iterate files.
-        for (const auto& f : fs::directory_iterator(p)) {
-            const auto fname = f.path().filename().string();
-            if (f.is_regular_file()) {
-                os << extract(p, fname, tag);
-            }
-        } 
-    } else
-        error("Invalid cardinality. Only 1 or N are allowed.", parse_error);
+    // Get the dir.
+    std::string srcfname=path.filename().string();
+    fs::path dir = path.remove_filename();
+
+    for (const auto& f : fs::directory_iterator(dir)) {
+        const auto fname = f.path().filename().string();
+        if (f.is_regular_file() && fname==srcfname)
+            os << extract(dir, fname, tag);
+    } 
 
     return os.str();
 }

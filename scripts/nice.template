@@ -12,19 +12,41 @@
 #ifndef _NICE_HPP
 #define _NICE_HPP
 
-{{$INCLUDE INC N native}}
-{{$INCLUDE INC 1}}
+#ifdef __GTK__
+{{$INCLUDE INC native/gtk/includes.hpp}}
+{{$INCLUDE INC native/gtk/types.hpp}}
+#elif __SDL__
+{{$INCLUDE INC native/sdl/includes.hpp}}
+{{$INCLUDE INC native/sdl/types.hpp}}
+#elif __WIN__
+{{$INCLUDE INC native/win/includes.hpp}}
+{{$INCLUDE INC native/win/types.hpp}}
+#elif __X11__
+{{$INCLUDE INC native/x11/includes.hpp}}
+{{$INCLUDE INC native/x11/types.hpp}}
+#endif
+
+{{$INCLUDE INC includes.hpp}}
 
 namespace nice {
 
-{{$INCLUDE TYP N native}}
-{{$INCLUDE TYP 1}}
+{{$INCLUDE DEC exception.hpp}}
+{{$INCLUDE DEC signal.hpp}}
+{{$INCLUDE DEC literals.hpp}}
+{{$INCLUDE DEC resource.hpp}}
+{{$INCLUDE DEC property.hpp}}
+{{$INCLUDE DEC geometry.hpp}}
+{{$INCLUDE DEC mouse_info.hpp}}
+{{$INCLUDE DEC wnd.hpp}}
 
-{{$INCLUDE DEC 1}}
-{{$INCLUDE DEC N native}}
-
-{{$INCLUDE DEF 1}}
-{{$INCLUDE DEF N native}}
+{{$INCLUDE DEF exception.hpp}}
+{{$INCLUDE DEF signal.hpp}}
+{{$INCLUDE DEF literals.hpp}}
+{{$INCLUDE DEF resource.hpp}}
+{{$INCLUDE DEF property.hpp}}
+{{$INCLUDE DEF geometry.hpp}}
+{{$INCLUDE DEF mouse_info.hpp}}
+{{$INCLUDE DEF wnd.hpp}}
 
 }
 
