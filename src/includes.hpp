@@ -13,4 +13,5 @@
 #include <exception>
 #include <string>
 #include <functional>
+#include <map>
 //{{END.INC}}

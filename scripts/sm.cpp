@@ -48,7 +48,6 @@ std::string extract(const fs::path& path, const std::string& fname, const std::s
     }
 
     fle.close();
-
     return os.str();
 }
 
