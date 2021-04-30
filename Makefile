@@ -21,8 +21,11 @@ export CXXFLAGS		= -std=c++2a -I$(INC_DIR) -g
 
 
 # Rules.
-.PHONY: all
-all: dirs tools $(NICELIB) $(SAMPLES)
+.PHONY: x11
+x11: nice $(SAMPLES)
+
+.PHONY: nice
+nice: dirs tools $(NICELIB) 
 
 # Create the tmp folder.
 .PHONY: dirs

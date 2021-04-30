@@ -14,16 +14,16 @@
 
 #ifdef __GTK__
 {{$INCLUDE INC native/gtk/includes.hpp}}
-{{$INCLUDE INC native/gtk/types.hpp}}
+{{$INCLUDE DEC native/gtk/types.hpp}}
 #elif __SDL__
 {{$INCLUDE INC native/sdl/includes.hpp}}
-{{$INCLUDE INC native/sdl/types.hpp}}
+{{$INCLUDE DEC native/sdl/types.hpp}}
 #elif __WIN__
 {{$INCLUDE INC native/win/includes.hpp}}
-{{$INCLUDE INC native/win/types.hpp}}
+{{$INCLUDE DEC native/win/types.hpp}}
 #elif __X11__
 {{$INCLUDE INC native/x11/includes.hpp}}
-{{$INCLUDE INC native/x11/types.hpp}}
+{{$INCLUDE DEC native/x11/types.hpp}}
 #endif
 
 {{$INCLUDE INC includes.hpp}}

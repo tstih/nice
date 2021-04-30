@@ -1,3 +1,5 @@
+[![language.badge]][language.url] [![standard.badge]][standard.url] [![license.badge]][license.url] [![release.badge]][release.url]
+ 
  # Welcome to nice
 
 by Tomaz Stih
@@ -57,35 +59,21 @@ void program()
 }
 ~~~
 
-# Caveat!
-
-On unix nice namespace unfortunately conflicts with the `nice()` system function 
-so if you plan to use it you need to redefine it.
-
-~~~cpp
-#define nice _nice
-#include <>
-#undef nice
-~~~
-
-and use the following system call `_nice()`.
-
 # Compiling
 
 ## Windows
 
-Install Visual Studio 64bit compilers, and cmake it.
+Upgrading.
 
 ## Linux
 
 Unpack it. Then go to the target folder and do
 
 ~~~
-cd build
-cmake ..
-make
+make x11
 ~~~
 
+Other options for Linux (at time of writing) are: `gtk`.
 
 # Status
 
@@ -125,15 +113,15 @@ Part 4: [Porting nice to a new platform: X11](https://github.com/tstih/nice/tree
 
 Part 5: [The Scrible!](https://github.com/tstih/nice/tree/master/doc/lesson5)
 
-Part 6: Child windows and layout managers
+Part 6: Child windows and layout managers (unfinished)
 
-Part 7: Custom controls
+Part 7: Custom controls (unfinished)
 
-Part 8: Adding a handful of common controls
+Part 8: Adding a handful of common controls (unfinished)
 
-Part 9: The style
+Part 9: The style (unfinished)
 
-Part 10: At the end it's all about being nice
+Part 10: At the end it's all about being nice (unfinished)
 
 
 # Bumps on the road
@@ -142,10 +130,7 @@ The mistakes we made and lessons we took on the way.
 
 ## To Wayland or not to Wayland?
 
-Perhaps one day we will Wayland, but at this moment we won't. Wayland is a technology 
-for drawing things quickly. It has no widgets. If ~nice~ had been implemented on top of 
-Wayland, it would have to re-implement many features, that are already part of toolkits, 
-such as GTK+ or QT.
+Perhaps one day we will Wayland, but at this moment we won't. Wayland is a technology for drawing things quickly. It has no widgets. If ~nice~ had been implemented on top of Wayland, it would have to re-implement many features that are already part of toolkits, such as GTK+ or QT.
 
 ## Fluent interface
 
@@ -179,3 +164,13 @@ Windows Fonts
 
 User defined literals
  * https://akrzemi1.wordpress.com/2012/08/12/user-defined-literals-part-i/
+
+
+[language.url]:   https://isocpp.org/
+[language.badge]: https://img.shields.io/badge/language-C++-blue.svg
+
+[standard.url]:   https://en.wikipedia.org/wiki/C%2B%2B#Standardization
+[standard.badge]: https://img.shields.io/badge/C%2B%2B-20-blue.svg
+
+[license.url]:    https://github.com/tstih/nice/blob/master/LICENSE
+[license.badge]:  https://img.shields.io/badge/license-MIT-blue.svg

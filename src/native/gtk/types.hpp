@@ -20,26 +20,20 @@ namespace nice {
     // Unix process id.
     typedef pid_t app_id;
 
-    // Basic X11 stuff.
-    typedef struct x11_app_instance {
-        Display* d;
-    } app_instance;
+    // Basic GTK stuff.
+    typedef GtkApplication* app_instance; // Not used.
 
-    // X11 window instance.
-    typedef Window wnd_instance;
+    // Window instance.
+    typedef GtkWidget*  wnd_instance;
 
-    // X11 coordinate.
+    // Coordinate.
     typedef int coord;
 
     // 8 bit integer.
     typedef uint8_t byte;
 
-    // X11 GC and required stuff.
-    typedef struct x11_canvas {
-        Display* d;
-        Window w;
-        GC gc;
-    } canvas;
+    // lib cairo and required stuff.
+    typedef cairo_t* canvas;
 
 }
 //{{END.DEC}}

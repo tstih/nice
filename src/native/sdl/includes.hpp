@@ -10,9 +10,5 @@
 // 
 
 //{{BEGIN.INC}}
-extern "C" {
-#include <stdint.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-}
+
 //{{END.INC}}
