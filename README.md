@@ -1,4 +1,4 @@
-[![language.badge]][language.url] [![standard.badge]][standard.url] [![license.badge]][license.url] [![release.badge]][release.url]
+[![language.badge]][language.url] [![standard.badge]][standard.url] [![license.badge]][license.url]
  
  # Welcome to nice
 
