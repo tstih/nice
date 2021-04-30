@@ -61,10 +61,6 @@ void program()
 
 # Compiling
 
-## Windows
-
-Upgrading.
-
 ## Linux
 
 Unpack it. Then go to the target folder and do
