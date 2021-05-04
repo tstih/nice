@@ -61,9 +61,17 @@ void program()
 
 # Compiling
 
-## Linux
+Unpack it and go to the target folder.
 
-Unpack it. Then go to the target folder and do
+## Windows
+
+Make sure your `vcvarsall.bat` (Visual Studio variables) are all set.
+
+~~~
+nmake /F Makefile.nmake
+~~~
+
+## Linux
 
 ~~~
 make x11
