@@ -98,6 +98,7 @@ int main(int argc, char *argv[]) {
     // Directory, template and recurse args.
     std::string d, t;
     bool r=false; 
+    bool w=false; // Convert paths to Windows paths...
 
     // Parse args..
     int i=1;
@@ -113,6 +114,8 @@ int main(int argc, char *argv[]) {
             d=argv[++i];
         } else if (arg=="-r") {
             r=true;
+        } else if (arg=="-w") {
+            w=true;
         }
         ++i;
     }
@@ -121,6 +124,7 @@ int main(int argc, char *argv[]) {
     auto directory = d.empty() ? 
         fs::current_path() / "src": 
         fs::path(d);
+
     auto tplfname = t.empty() ?
         fs::current_path() / "scripts/nice.template":
         fs::path(t);
