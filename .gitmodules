@@ -1,0 +1,6 @@
+[submodule "lib/wildcards"]
+	path = lib/wildcards
+	url = https://github.com/zemasoft/wildcards.git
+[submodule "lib/wildcardcmp"]
+	path = lib/wildcardcmp
+	url = https://github.com/clibs/wildcardcmp.git

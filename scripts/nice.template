@@ -30,6 +30,7 @@
 
 namespace nice {
 
+// The order of declarations is important...
 {{$INCLUDE DEC exception.hpp}}
 {{$INCLUDE DEC signal.hpp}}
 {{$INCLUDE DEC literals.hpp}}
@@ -39,14 +40,9 @@ namespace nice {
 {{$INCLUDE DEC mouse_info.hpp}}
 {{$INCLUDE DEC wnd.hpp}}
 
-{{$INCLUDE DEF exception.hpp}}
-{{$INCLUDE DEF signal.hpp}}
-{{$INCLUDE DEF literals.hpp}}
-{{$INCLUDE DEF resource.hpp}}
-{{$INCLUDE DEF property.hpp}}
-{{$INCLUDE DEF geometry.hpp}}
-{{$INCLUDE DEF mouse_info.hpp}}
-{{$INCLUDE DEF wnd.hpp}}
+// ...the order of definitions is not important.
+{{$INCLUDE DEF *.hpp}}
+{{$INCLUDE DEF *.cpp}}
 
 }
 

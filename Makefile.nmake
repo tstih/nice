@@ -1,6 +1,7 @@
 # Configure output folders for Windows.
 ROOT_DIR		= $(MAKEDIR)
 INC_DIR			= $(ROOT_DIR)\include
+LIB_DIR 		= $(ROOT_DIR)\lib
 BUILD_DIR		= $(ROOT_DIR)\build
 SCRIPT_DIR		= $(ROOT_DIR)\scripts
 SAMPLES 		= $(ROOT_DIR)\samples
@@ -13,7 +14,8 @@ RMDIR			= -rmdir /S /Q
 NO_ERR			= 2> NUL
 RM			= -del
 CXX			= cl
-CXXFLAGS		= /nologo /c /std:c++latest /I$(INC_DIR) /Zi /EHsc -D__WIN__
+CXXFLAGS		= /nologo /c /std:c++latest /Zi /EHsc -D__WIN__ \
+			  /I$(INC_DIR) /I$(LIB_DIR)
 LD			= link
 CLDFLAGS		=
 WLDFLAGS		= /subsystem:windows user32.lib 
@@ -31,11 +33,14 @@ dirs:
 # Create the sm tool.
 tools: $(BUILD_DIR)\sm.exe
 
-$(BUILD_DIR)\sm.exe: $(BUILD_DIR)\sm.obj
-	$(LD) $(CLDFLAGS) -out:$(BUILD_DIR)\sm.exe $(BUILD_DIR)\sm.obj
+$(BUILD_DIR)\sm.exe: $(BUILD_DIR)\sm.obj $(BUILD_DIR)\wildcardcmp.obj
+	$(LD) $(CLDFLAGS) -out:$(BUILD_DIR)\sm.exe $(BUILD_DIR)\sm.obj $(BUILD_DIR)\wildcardcmp.obj
 
 $(BUILD_DIR)\sm.obj: $(SCRIPT_DIR)\sm.cpp 
 	$(CXX) $(CXXFLAGS) /Fo:$(BUILD_DIR)\sm.obj /Fd:$(BUILD_DIR)\sm.pdb $(SCRIPT_DIR)\sm.cpp	
+
+$(BUILD_DIR)\wildcardcmp.obj: $(LIB_DIR)\wildcardcmp\wildcardcmp.c
+	$(CXX) $(CXXFLAGS) /Fo:$(BUILD_DIR)\wildcardcmp.obj /Fd:$(BUILD_DIR)\wildcardcmp.pdb $(LIB_DIR)\wildcardcmp\wildcardcmp.c	
 
 # Create the nice library
 $(NICELIB): $(SCRIPT_DIR)\nice.template

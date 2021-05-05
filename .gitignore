@@ -30,10 +30,6 @@
 *.exe
 *.out
 *.app
-/.vs
+.vs
 /out/build/x64-Debug
 /out/build/x64-Debug (default)
-/doc/lesson1/.vs/lesson1/v16/ipch/AutoPCH/f5d3d7992ca93e38/EXE_COMMON.ipch
-/doc/lesson1/.vs/lesson1/v16/.suo
-/doc/lesson1/.vs/lesson1/v16/Browse.VC.db
-/doc/lesson1/.vs

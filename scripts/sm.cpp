@@ -1,10 +1,13 @@
-// Call from root folder: tmp/sm -t scripts/nice.template -d src
-
+// Call: sm -t scripts/nice.template -d src
 #include <iostream>
 #include <fstream>
 #include <filesystem>
 #include <sstream>
 #include <regex>
+
+extern "C" {
+#include "wildcardcmp/wildcardcmp.h"
+}
 
 namespace fs=std::filesystem;
 
@@ -73,7 +76,7 @@ std::string evaluate(const fs::path& root, std::string line, int n) {
     // Add path to our path string.
     fs::path path = root / pathstr;
     if (!path.has_filename()) 
-        error("Filename or *.ext must be part of the path", no_file);
+        error("Filename or wildcard expression must be part of the path", no_file);
 
     // Get the dir.
     std::string srcfname=path.filename().string();
@@ -81,7 +84,7 @@ std::string evaluate(const fs::path& root, std::string line, int n) {
 
     for (const auto& f : fs::directory_iterator(dir)) {
         const auto fname = f.path().filename().string();
-        if (f.is_regular_file() && fname==srcfname)
+        if (f.is_regular_file() && wildcardcmp(srcfname.c_str(), fname.c_str()))
             os << extract(dir, fname, tag);
     } 
 
