@@ -19,9 +19,9 @@
 
 namespace nice {
 
-    class wnd : public resource<wnd_instance, 0> {
+//{{BEGIN.DEC}}
+    class wnd : public resource<wnd_instance, WND_NULL> {
     public:
-
         // Ctor(s) and dtor.
         wnd() {}
         virtual ~wnd() { destroy(); }
@@ -59,7 +59,6 @@ namespace nice {
         signal<const mouse_info&> mouse_up;
 
     protected:
-
         // Setters and getters.
         virtual std::string get_title();
         virtual void set_title(std::string s);
@@ -69,10 +68,9 @@ namespace nice {
         virtual void set_location(pt location);
 
     private:
-
         std::unique_ptr<native_wnd> native_;
-
     };
+//{{END.DEC}}
 
 }
 

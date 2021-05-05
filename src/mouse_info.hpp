@@ -14,7 +14,6 @@
 namespace nice {
 
 //{{BEGIN.DEC}}
-  
     // Buton status: true=down, false=up.
     struct mouse_info {
         pt location;
@@ -24,7 +23,6 @@ namespace nice {
         bool ctrl;
         bool shift;
     };
-
 //{{END.DEC}}
 
 }

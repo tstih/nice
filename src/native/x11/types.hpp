@@ -27,6 +27,7 @@ namespace nice {
 
     // X11 window instance.
     typedef Window wnd_instance;
+    #define WND_NULL 0
 
     // X11 coordinate.
     typedef int coord;

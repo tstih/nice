@@ -25,6 +25,7 @@ namespace nice {
 
     // Window instance.
     typedef GtkWidget*  wnd_instance;
+    #define WND_NULL nullptr
 
     // Coordinate.
     typedef int coord;

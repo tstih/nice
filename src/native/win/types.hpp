@@ -24,6 +24,7 @@ namespace nice {
 
     // Mapped to window handle.
     typedef HWND wnd_instance;
+    #define WND_NULL nullptr
 
     // Screen coordinate for all geometry functions.
     typedef LONG coord;
