@@ -5,9 +5,7 @@
 #include <sstream>
 #include <regex>
 
-extern "C" {
 #include "wildcardcmp/wildcardcmp.h"
-}
 
 namespace fs=std::filesystem;
 

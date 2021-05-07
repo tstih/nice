@@ -61,17 +61,28 @@ void program()
 
 # Compiling
 
-Unpack it and go to the target folder.
+Open your terminal application and clone the git archive with
+
+`git clone --recursive https://github.com/tstih/nice.git`
+
+The `--recursive` flag will get the repository and all submodules
+i.e. dependencies. Then `cd` to the repository folder and execute
+build command (see following two chapters for the correct build 
+command).
 
 ## Windows
 
 Make sure your `vcvarsall.bat` (Visual Studio variables) are all set.
+
+The build command is
 
 ~~~
 nmake /F Makefile.nmake
 ~~~
 
 ## Linux
+
+The build command is
 
 ~~~
 make x11

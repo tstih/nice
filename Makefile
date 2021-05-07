@@ -8,6 +8,7 @@ endif
 ROOT_DIR			= $(shell pwd)
 export INC_DIR		= $(ROOT_DIR)/include
 export BUILD_DIR	= $(ROOT_DIR)/build
+export LIB_DIR		= $(ROOT_DIR)/lib
 SCRIPT_DIR			= $(ROOT_DIR)/scripts
 SAMPLES 			= $(ROOT_DIR)/samples
 NICELIB 			= $(INC_DIR)/nice.hpp
@@ -17,7 +18,7 @@ NICELIB 			= $(INC_DIR)/nice.hpp
 MKDIR				= mkdir -p
 RMDIR				= rm -r -f
 export CXX			= g++
-export CXXFLAGS		= -std=c++2a -I$(INC_DIR) -g
+export CXXFLAGS		= -std=c++2a -I$(INC_DIR) -I$(LIB_DIR) -g
 
 
 # Rules.
@@ -35,8 +36,8 @@ dirs:
 # Create the sm tool.
 .PHONY: tools
 tools: $(BUILD_DIR)/sm
-$(BUILD_DIR)/sm: $(SCRIPT_DIR)/sm.cpp 
-	$(CXX) $(CXXFLAGS) -o $(BUILD_DIR)/sm $(SCRIPT_DIR)/sm.cpp 
+$(BUILD_DIR)/sm: $(SCRIPT_DIR)/sm.cpp $(LIB_DIR)/wildcardcmp/wildcardcmp.c
+	$(CXX) $(CXXFLAGS) -o $(BUILD_DIR)/sm $(SCRIPT_DIR)/sm.cpp $(LIB_DIR)/wildcardcmp/wildcardcmp.c
 
 # Create the nice library
 $(NICELIB): $(SCRIPT_DIR)/nice.template
