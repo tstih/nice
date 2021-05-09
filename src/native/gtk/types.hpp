@@ -14,9 +14,9 @@
 
 #include "includes.hpp"
 
-//{{BEGIN.DEC}}
 namespace nice {
 
+//{{BEGIN.TYP}}
     // Unix process id.
     typedef pid_t app_id;
 
@@ -35,8 +35,8 @@ namespace nice {
 
     // lib cairo and required stuff.
     typedef cairo_t* canvas;
+//{{END.TYP}}
 
 }
-//{{END.DEC}}
 
 #endif // _TYPES_HPP

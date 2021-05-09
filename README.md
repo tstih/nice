@@ -180,6 +180,9 @@ Windows Fonts
 User defined literals
  * https://akrzemi1.wordpress.com/2012/08/12/user-defined-literals-part-i/
 
+PIMPL for GUI
+ * https://stackoverflow.com/questions/35191894/pimpl-with-inheritance-using-smart-pointer
+
 
 [language.url]:   https://isocpp.org/
 [language.badge]: https://img.shields.io/badge/language-C++-blue.svg

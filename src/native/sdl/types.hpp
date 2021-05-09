@@ -14,8 +14,8 @@
 
 #include "includes.hpp"
 
-//{{BEGIN.DEC}}
+//{{BEGIN.TYP}}
 
-//{{END.DEC}}
+//{{END.TYP}}
 
 #endif // _TYPES_HPP

@@ -33,7 +33,7 @@ namespace nice {
             // Create local mutex.
             std::ostringstream name;
             name << "Local\\" << aname;
-            ::CreateMutex(0, FALSE, name().str().c_str());
+            ::CreateMutex(0, FALSE, name.str().c_str());
             // We are primary instance.
             primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
         }
@@ -42,7 +42,7 @@ namespace nice {
 
     void app::run(const app_wnd& w) {
         // Show window.
-        ::ShowWindow(w.instance(), SW_SHOWNORMAL);
+        w.show();
 
         // Message loop.
         MSG msg;

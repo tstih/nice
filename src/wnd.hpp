@@ -1,12 +1,12 @@
 //
 // wnd.hpp
 // 
-// Base window class. 
+// Window class. 
 // 
-// (c) 2020 Tomaz Stih
+// (c) 2021 Tomaz Stih
 // This code is licensed under MIT license (see LICENSE.txt for details).
 // 
-// 17.01.2020   tstih
+// 17.01.2021   tstih
 // 
 #ifndef _WND_HPP
 #define _WND_HPP
@@ -20,15 +20,11 @@
 namespace nice {
 
 //{{BEGIN.DEC}}
-    class wnd : public resource<wnd_instance, WND_NULL> {
+    class wnd  {
     public:
         // Ctor(s) and dtor.
         wnd() {}
-        virtual ~wnd() { destroy(); }
-
-        // resource implementation.
-        virtual wnd_instance create() = 0;        
-        void destroy() noexcept override;
+        virtual ~wnd();
 
         // Methods.
         void repaint(void);
@@ -67,11 +63,17 @@ namespace nice {
         virtual pt get_location();
         virtual void set_location(pt location);
 
+        virtual native_wnd* native() {
+            if (native_==nullptr)
+                native_=std::make_unique<native_wnd>();
+            return native_.get();
+        }
+
     private:
-        std::unique_ptr<native_wnd> native_;
+        std::unique_ptr<native_wnd> native_ { nullptr };
     };
 //{{END.DEC}}
 
-}
+} // namespace nice
 
 #endif // _WND_HPP

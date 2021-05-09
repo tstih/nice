@@ -3,10 +3,10 @@
 // 
 // Custom exception class, used by nice functions to throw domain exceptions.
 // 
-// (c) 2020 Tomaz Stih
+// (c) 2021 Tomaz Stih
 // This code is licensed under MIT license (see LICENSE.txt for details).
 // 
-// 16.01.2020   tstih
+// 16.01.2021   tstih
 // 
 #ifndef _EXCEPTION_HPP
 #define _EXCEPTION_HPP

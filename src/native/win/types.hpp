@@ -3,19 +3,19 @@
 // 
 // Mapping standard nice types to MS Windows types.
 // 
-// (c) 2020 Tomaz Stih
+// (c) 2021 Tomaz Stih
 // This code is licensed under MIT license (see LICENSE.txt for details).
 // 
-// 16.01.2020   tstih
+// 16.01.2021   tstih
 // 
 #ifndef _TYPES_HPP
 #define _TYPES_HPP
 
 #include "includes.hpp"
 
-//{{BEGIN.DEC}}
 namespace nice {
 
+//{{BEGIN.TYP}}
     // Mapped to Win32 process id.
     typedef DWORD  app_id;
 
@@ -34,8 +34,8 @@ namespace nice {
 
     // Mapped to device context.
     typedef HDC canvas;
+//{{END.TYP}}
 
 }
-//{{END.DEC}}
 
 #endif // _TYPES_HPP
