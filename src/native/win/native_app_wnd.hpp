@@ -1,7 +1,7 @@
 //
 // native_app_wnd.hpp
 // 
-// Native application window implementation for MS Windows.
+// Native application window declaration for MS Windows.
 // 
 // (c) 2021 Tomaz Stih
 // This code is licensed under MIT license (see LICENSE.txt for details).
@@ -19,7 +19,11 @@ namespace nice {
     class app_wnd; // Forward declaration.
     class native_app_wnd : public native_wnd {
     public:
-        void show() { ::ShowWindow(hwnd_, SW_SHOWNORMAL); }
+        native_app_wnd(app_wnd *window);
+        virtual ~native_app_wnd();
+        void show();
+    private:
+        app_wnd* window_;
     };
 //{{END.DEC}}
 

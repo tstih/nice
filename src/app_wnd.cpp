@@ -13,10 +13,16 @@
 namespace nice {
 //{{BEGIN.DEF}}
     bool app_wnd::on_destroy() {
-
+        return true;
     }   
 
-    void app_wnd::show() const {
+    native_app_wnd* app_wnd::native() {
+        if (native_==nullptr)
+            native_=std::make_unique<native_app_wnd>(this);
+        return native_.get();
+    }
+
+    void app_wnd::show() {
         native()->show();
     }
 //{{END.DEF}}

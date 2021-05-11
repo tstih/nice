@@ -28,17 +28,12 @@ namespace nice {
             // Subscribe to destroy signal.
             destroyed.connect(this, &app_wnd::on_destroy);
         }
-        void show() const;
+        void show();
     protected:
         // Destroyed handler...
         bool on_destroy();         
         // Pimpl implementation.
-        virtual native_app_wnd* native() override {
-            if (native_==nullptr)
-                native_=std::make_unique<native_app_wnd>(this);
-            return native_.get();
-        }
-
+        virtual native_app_wnd* native();
     private:
         std::unique_ptr<native_app_wnd> native_ { nullptr };
         std::string title_;

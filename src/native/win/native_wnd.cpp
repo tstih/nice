@@ -21,7 +21,7 @@ namespace nice {
         window_=window;
     }
 
-    native_wnd::~naitive_wnd() {
+    native_wnd::~native_wnd() {
         ::DestroyWindow(hwnd_);
     }
 
@@ -106,10 +106,10 @@ namespace nice {
             case WM_PAINT:
             {
                 PAINTSTRUCT ps;
-                HDC hdc = BeginPaint(instance(), &ps);
+                HDC hdc = BeginPaint(hwnd_, &ps);
                 artist a(hdc);
                 window_->paint.emit(a);
-                EndPaint(instance(), &ps);
+                EndPaint(hwnd_, &ps);
             }
             break;
             case WM_MOUSEMOVE:
@@ -123,11 +123,11 @@ namespace nice {
                 // Populate the mouse info structure.
                 mouse_info mi = {
                     {GET_X_LPARAM(lparam),GET_Y_LPARAM(lparam)}, // point
-                    wparam & MK_LBUTTON,
-                    wparam & MK_MBUTTON,
-                    wparam & MK_RBUTTON,
-                    wparam & MK_CONTROL,
-                    wparam & MK_SHIFT,
+                    (bool)(wparam & MK_LBUTTON),
+                    (bool)(wparam & MK_MBUTTON),
+                    (bool)(wparam & MK_RBUTTON),
+                    (bool)(wparam & MK_CONTROL),
+                    (bool)(wparam & MK_SHIFT)
                 };
                 if (msg == WM_MOUSEMOVE)
                     window_->mouse_move.emit(mi);
@@ -149,7 +149,7 @@ namespace nice {
             }
                 break;
             default:
-                return ::DefWindowProc(instance(), msg, wparam, lparam);
+                return ::DefWindowProc(hwnd_, msg, wparam, lparam);
             }
             return 0;
 

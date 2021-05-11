@@ -63,11 +63,8 @@ namespace nice {
         virtual pt get_location();
         virtual void set_location(pt location);
 
-        virtual native_wnd* native() {
-            if (native_==nullptr)
-                native_=std::make_unique<native_wnd>();
-            return native_.get();
-        }
+        // Pimpl.
+        virtual native_wnd* native();
 
     private:
         std::unique_ptr<native_wnd> native_ { nullptr };

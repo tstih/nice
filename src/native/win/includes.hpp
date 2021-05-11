@@ -12,5 +12,6 @@
 //{{BEGIN.INC}}
 extern "C" {
 #include <windows.h>
+#include <windowsx.h>
 }
 //{{END.INC}}
