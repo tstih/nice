@@ -52,7 +52,7 @@ $(BUILD_DIR)\minimal.exe: $(BUILD_DIR)\minimal.obj
 	$(LD) $(WLDFLAGS) -out:$(BUILD_DIR)\minimal.exe $(BUILD_DIR)\minimal.obj
 
 $(BUILD_DIR)\minimal.obj: $(SAMPLES)\1_minimal.cpp
-	$(CXX) $(CXXFLAGS) /Fo:$(BUILD_DIR)\minimal.obj $(SAMPLES)\1_minimal.cpp
+	$(CXX) $(CXXFLAGS) /Fo:$(BUILD_DIR)\minimal.obj /Fd:$(BUILD_DIR)\minimal.pdb $(SAMPLES)\1_minimal.cpp
 	
 clean:
 	$(RMDIR) $(BUILD_DIR) $(NO_ERR)
