@@ -19,7 +19,11 @@ namespace nice {
     class app_wnd; // Forward declaration.
     class native_app_wnd : public native_wnd {
     public:
-        native_app_wnd(app_wnd *window);
+        native_app_wnd(
+            app_wnd *window,
+            std::string title,
+            size size
+        );
         virtual ~native_app_wnd();
         void show() const;
     };

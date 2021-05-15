@@ -12,8 +12,6 @@
 
 namespace nice {
 //{{BEGIN.DEF}}
-    wnd::~wnd() { native()->destroy(); }
-
     void wnd::repaint(void) { native()->repaint(); }
     
     std::string wnd::get_title() { return native()->get_title(); }
@@ -27,10 +25,5 @@ namespace nice {
     pt wnd::get_location() { return native()->get_location(); }
     
     void wnd::set_location(pt location) { native()->set_location(location); } 
-
-    native_wnd* wnd::native() {
-        if (native_==nullptr) native_=std::make_unique<native_wnd>(this);
-        return native_.get();
-     }
 //{{END.DEF}}
 }

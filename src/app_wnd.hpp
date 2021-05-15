@@ -22,13 +22,14 @@ namespace nice {
 //{{BEGIN.DEC}}
     class app_wnd : public wnd {
     public:
-        app_wnd(std::string title, size size) : wnd() {
+        app_wnd(std::string title, size size) : native_(nullptr) {
             // Store parameters.
             title_ = title; size_ = size;
             // Subscribe to destroy signal.
             destroyed.connect(this, &app_wnd::on_destroy);
         }
         void show();
+        
     protected:
         // Destroyed handler...
         bool on_destroy();         
@@ -37,6 +38,7 @@ namespace nice {
     private:
         std::string title_;
         size size_;
+        std::unique_ptr<native_app_wnd> native_;
     };
 //{{END.DEC}}
 

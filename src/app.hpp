@@ -52,6 +52,14 @@ namespace nice {
     bool app::primary_ = false;
     app_instance app::instance_;
 
+    app_instance app::instance() {
+        return instance_;
+    }
+
+    void app::instance(app_instance instance) {
+        instance_=instance;
+    }
+
 //{{END.DEF}}
 
 }

@@ -22,10 +22,6 @@ namespace nice {
 //{{BEGIN.DEC}}
     class wnd  {
     public:
-        // Ctor(s) and dtor.
-        wnd() {}
-        virtual ~wnd();
-
         // Methods.
         void repaint(void);
 
@@ -63,11 +59,8 @@ namespace nice {
         virtual pt get_location();
         virtual void set_location(pt location);
 
-        // Pimpl.
-        virtual native_wnd* native();
-
-    private:
-        std::unique_ptr<native_wnd> native_ { nullptr };
+        // Pimpl. Concrete window must implement this!
+        virtual native_wnd* native() = 0;
     };
 //{{END.DEC}}
 

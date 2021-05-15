@@ -22,14 +22,6 @@ namespace nice {
         return std::filesystem::path(args[0]).stem().string();
     }
 
-    app_instance app::instance() {
-        return instance_;
-    }
-
-    void app::instance(app_instance instance) {
-        instance_=instance;
-    }
-
     bool app::is_primary_instance() {
         // Are we already primary instance? If not, try to become one.
         if (!primary_) {
