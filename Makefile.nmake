@@ -18,7 +18,7 @@ CXXFLAGS		= /nologo /c /std:c++latest /Zi /EHsc -D__WIN__ \
 			  /I$(INC_DIR) /I$(LIB_DIR)
 LD			= link
 CLDFLAGS		=
-WLDFLAGS		= /subsystem:windows user32.lib 
+WLDFLAGS		= /subsystem:windows user32.lib Gdi32.lib
 
 # Rules.
 all: nice samples

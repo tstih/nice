@@ -21,9 +21,7 @@ namespace nice {
     public:
         native_app_wnd(app_wnd *window);
         virtual ~native_app_wnd();
-        void show();
-    private:
-        app_wnd* window_;
+        void show() const;
     };
 //{{END.DEC}}
 

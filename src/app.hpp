@@ -29,8 +29,9 @@ namespace nice {
         // Application name. First cmd line arg without extension.
         static std::string name();
 
-        // Application instance.
+        // Application instance get and set.
         static app_instance instance();
+        static void instance(app_instance instance);
 
         // Is another instance already running?
         static bool is_primary_instance();

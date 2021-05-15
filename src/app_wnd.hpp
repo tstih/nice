@@ -33,9 +33,8 @@ namespace nice {
         // Destroyed handler...
         bool on_destroy();         
         // Pimpl implementation.
-        virtual native_app_wnd* native();
+        virtual native_app_wnd* native() override;
     private:
-        std::unique_ptr<native_app_wnd> native_ { nullptr };
         std::string title_;
         size size_;
     };

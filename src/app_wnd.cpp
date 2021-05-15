@@ -17,13 +17,11 @@ namespace nice {
     }   
 
     native_app_wnd* app_wnd::native() {
-        if (native_==nullptr)
-            native_=std::make_unique<native_app_wnd>(this);
-        return native_.get();
+        return static_cast<native_app_wnd*>(wnd::native());
     }
 
     void app_wnd::show() {
-        native()->show();
+        // TODO: native()->show();
     }
 //{{END.DEF}}
 }

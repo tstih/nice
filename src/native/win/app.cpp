@@ -26,6 +26,10 @@ namespace nice {
         return instance_;
     }
 
+    void app::instance(app_instance instance) {
+        instance_=instance;
+    }
+
     bool app::is_primary_instance() {
         // Are we already primary instance? If not, try to become one.
         if (!primary_) {
@@ -41,8 +45,11 @@ namespace nice {
     }
 
     void app::run(const app_wnd& w) {
-        // Show window.
-        w.show();
+
+        // We have to cast the constness away to 
+        // call non-const functions on window.
+        auto& main_wnd=const_cast<app_wnd &>(w);
+        main_wnd.show();
 
         // Message loop.
         MSG msg;

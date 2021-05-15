@@ -70,4 +70,11 @@ namespace nice {
 
 }
 
+#ifdef __GTK__
+#elif __SDL__
+#elif __WIN__
+{{$INCLUDE CRT native/win/native_start.cpp}}
+#elif __X11__
+#endif
+
 #endif // _NICE_HPP

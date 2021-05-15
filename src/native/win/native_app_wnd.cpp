@@ -13,13 +13,13 @@
 namespace nice {
 
 //{{BEGIN.DEF}}
-    native_app_wnd::native_app_wnd(app_wnd *window) : native_wnd(window) {
-        window_=window;
+    native_app_wnd::native_app_wnd(app_wnd *window) : 
+        native_wnd(window) {
     }
 
     native_app_wnd::~native_app_wnd() {}
 
-    void native_app_wnd::show() { 
+    void native_app_wnd::show() const { 
         ::ShowWindow(hwnd_, SW_SHOWNORMAL); 
     }
 //{{END.DEF}}

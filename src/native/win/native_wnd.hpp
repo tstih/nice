@@ -39,7 +39,6 @@ namespace nice {
             HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
         virtual LRESULT local_wnd_proc(
             UINT msg, WPARAM wparam, LPARAM lparam);
-    private:
         wnd* window_;
     };
 //{{END.DEC}}
