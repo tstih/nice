@@ -22,10 +22,6 @@ namespace nice {
     // Mapped to Win32 application instace (passed to WinMain)
     typedef HINSTANCE app_instance;
 
-    // Mapped to window handle.
-    typedef HWND wnd_instance;
-    #define WND_NULL nullptr
-
     // Screen coordinate for all geometry functions.
     typedef LONG coord;
 
