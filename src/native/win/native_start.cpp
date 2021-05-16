@@ -8,6 +8,8 @@
 // 
 // 15.05.2021   tstih
 // 
+#include "nice.hpp"
+
 //{{BEGIN.CRT}}
 extern void program();
 

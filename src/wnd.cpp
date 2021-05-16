@@ -8,7 +8,7 @@
 // 
 // 09.05.2021   tstih
 // 
-#include "wnd.hpp"
+#include "nice.hpp"
 
 namespace nice {
 //{{BEGIN.DEF}}

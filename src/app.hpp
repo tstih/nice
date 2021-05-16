@@ -12,6 +12,8 @@
 #ifndef _APP_HPP
 #define _APP_HPP
 
+#include "app_wnd.hpp"
+
 namespace nice {
 
 //{{BEGIN.DEC}}
@@ -44,24 +46,6 @@ namespace nice {
         static app_instance instance_;     
     };
 //{{END.DEC}}
-
-//{{BEGIN.DEF}}
-
-    int app::ret_code = 0;
-    std::vector<std::string> app::args;
-    bool app::primary_ = false;
-    app_instance app::instance_;
-
-    app_instance app::instance() {
-        return instance_;
-    }
-
-    void app::instance(app_instance instance) {
-        instance_=instance;
-    }
-
-//{{END.DEF}}
-
 }
 
 #endif // _APP_HPP

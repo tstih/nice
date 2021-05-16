@@ -21,7 +21,7 @@ namespace nice {
             canvas_ = canvas;
         }
 
-         // Methods.
+        // Methods.
         void draw_line(color c, pt p1, pt p2) const;
         void draw_rect(color c, rct r) const;
         void fill_rect(color c, rct r) const;
@@ -31,5 +31,7 @@ namespace nice {
         canvas canvas_;
     };
 //{{END.DEC}}
+
+}
 
 #endif

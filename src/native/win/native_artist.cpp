@@ -1,5 +1,5 @@
 //
-// artist.cpp
+// native_artist.cpp
 // 
 // Encapsulate Windows GDI.
 // 
@@ -8,7 +8,7 @@
 // 
 // 05.05.2021   tstih
 // 
-#include "artist.hpp"
+#include "nice.hpp"
 
 namespace nice {
 

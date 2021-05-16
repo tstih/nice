@@ -1,5 +1,5 @@
 //
-// types.hpp
+// native_types.hpp
 // 
 // Mapping standard nice types to MS Windows types.
 // 
@@ -8,8 +8,8 @@
 // 
 // 16.01.2021   tstih
 // 
-#ifndef _TYPES_HPP
-#define _TYPES_HPP
+#ifndef _NATIVE_TYPES_HPP
+#define _NATIVE_TYPES_HPP
 
 #include "includes.hpp"
 
@@ -34,4 +34,4 @@ namespace nice {
 
 }
 
-#endif // _TYPES_HPP
+#endif // _NATIVE_TYPES_HPP

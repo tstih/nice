@@ -14,7 +14,7 @@
 #include "includes.hpp"
 #include "resource.hpp"
 #include "property.hpp"
-#include "signal.h"
+#include "signal.hpp"
 #include "geometry.hpp"
 
 namespace nice {

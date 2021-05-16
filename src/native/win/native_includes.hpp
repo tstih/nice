@@ -1,5 +1,5 @@
 //
-// includes.hpp
+// native_includes.hpp
 // 
 // Platform dependant includes.
 // 
@@ -8,6 +8,8 @@
 // 
 // 16.01.2021   tstih
 // 
+#ifndef _NATIVE_INCLUDES_HPP
+#define _NATIVE_INCLUDES_HPP
 
 //{{BEGIN.INC}}
 extern "C" {
@@ -15,3 +17,5 @@ extern "C" {
 #include <windowsx.h>
 }
 //{{END.INC}}
+
+#endif // _INCLUDES_HPP

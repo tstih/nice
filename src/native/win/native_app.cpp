@@ -1,15 +1,15 @@
 
 //
-// app.cpp
+// native_app.cpp
 // 
-// Application entry point & logic code.
+// Application entry point & logic native Windows code.
 // 
 // (c) 2021 Tomaz Stih
 // This code is licensed under MIT license (see LICENSE.txt for details).
 // 
 // 05.05.2021   tstih
 // 
-#include "app.h"
+#include "nice.hpp"
 
 namespace nice {
 

@@ -8,11 +8,14 @@
 // 
 // 09.05.2021   tstih
 // 
-#include "app_wnd.hpp"
+#include "nice.hpp"
 
 namespace nice {
 //{{BEGIN.DEF}}
     bool app_wnd::on_destroy() {
+        // Destroy native window.
+        native()->destroy();
+        // And tell the world we handled it.
         return true;
     }   
 
