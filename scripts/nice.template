@@ -12,11 +12,7 @@
 #ifndef _NICE_HPP
 #define _NICE_HPP
 
-#ifdef __GTK__
-{{$INCLUDE INC native/gtk/*.hpp}}
-#elif __SDL__
-{{$INCLUDE INC native/sdl/*.hpp}}
-#elif __WIN__
+#ifdef __WIN__
 {{$INCLUDE INC native/win/*.hpp}}
 #elif __X11__
 {{$INCLUDE INC native/x11/*.hpp}}
@@ -26,11 +22,7 @@
 
 namespace nice {
 
-#ifdef __GTK__
-{{$INCLUDE TYP native/gtk/*.hpp}}
-#elif __SDL__
-{{$INCLUDE TYP native/sdl/*.hpp}}
-#elif __WIN__
+#ifdef __WIN__
 {{$INCLUDE TYP native/win/*.hpp}}
 #elif __X11__
 {{$INCLUDE TYP native/x11/*.hpp}}
@@ -45,12 +37,12 @@ namespace nice {
 {{$INCLUDE DEC resized_info.hpp}}
 {{$INCLUDE DEC mouse_info.hpp}}
 {{$INCLUDE DEC artist.hpp}}
-#ifdef __GTK__
-#elif __SDL__
-#elif __WIN__
+#ifdef __WIN__
 {{$INCLUDE DEC native/win/native_wnd.hpp}}
 {{$INCLUDE DEC native/win/native_app_wnd.hpp}}
 #elif __X11__
+{{$INCLUDE DEC native/x11/native_wnd.hpp}}
+{{$INCLUDE DEC native/x11/native_app_wnd.hpp}}
 #endif
 {{$INCLUDE DEC wnd.hpp}}
 {{$INCLUDE DEC app_wnd.hpp}}
@@ -60,21 +52,20 @@ namespace nice {
 
 {{$INCLUDE DEF *.cpp}}
 
-#ifdef __GTK__
-#elif __SDL__
-#elif __WIN__
+#ifdef __WIN__
 {{$INCLUDE DEF native/win/*.hpp}}
 {{$INCLUDE DEF native/win/*.cpp}}
 #elif __X11__
+{{$INCLUDE DEF native/x11/*.hpp}}
+{{$INCLUDE DEF native/x11/*.cpp}}
 #endif
 
 }
 
-#ifdef __GTK__
-#elif __SDL__
-#elif __WIN__
+#ifdef __WIN__
 {{$INCLUDE CRT native/win/native_start.cpp}}
 #elif __X11__
+{{$INCLUDE CRT native/x11/native_start.cpp}}
 #endif
 
 #endif // _NICE_HPP

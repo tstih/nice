@@ -1,0 +1,35 @@
+//
+// native_start.cpp
+// 
+// Native start up adapter functions.
+// 
+// (c) 2021 Tomaz Stih
+// This code is licensed under MIT license (see LICENSE.txt for details).
+// 
+// 15.05.2021   tstih
+// 
+#include "nice.hpp"
+
+//{{BEGIN.CRT}}
+extern void program();
+
+int main(int argc, char* argv[]) {
+    // X Windows initialization code.
+    nice::app::instance(XOpenDisplay(NULL));
+
+    // Copy cmd line arguments to vector.
+    nice::app::args = std::vector<std::string>(argv, argv + argc);
+
+    // Try becoming primary instance...
+    nice::app::is_primary_instance();
+    
+    // Run program.
+    program();
+    
+    // Close display.
+    XCloseDisplay(nice::app::instance());
+
+    // And return return code;
+    return nice::app::ret_code;
+}
+//{{END.CRT}}

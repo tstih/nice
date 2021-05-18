@@ -1,5 +1,5 @@
 //
-// includes.hpp
+// native_includes.hpp
 // 
 // Platform dependant includes.
 // 
@@ -11,7 +11,13 @@
 
 //{{BEGIN.INC}}
 extern "C" {
+#define nice unix_nice
+#include <unistd.h>
+#undef nice
 #include <stdint.h>
+#include <fcntl.h>
+#include <sys/file.h>
+
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 }

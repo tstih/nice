@@ -1,8 +1,7 @@
 //
-// types.hpp
+// native_types.hpp
 // 
 // Mapping standard nice types to MS Windows types.
-// TODO: Use Cairo for painting.
 // 
 // (c) 2020 Tomaz Stih
 // This code is licensed under MIT license (see LICENSE.txt for details).
@@ -22,12 +21,8 @@ namespace nice {
 
     // Basic X11 stuff.
     typedef struct x11_app_instance {
-        Display* d;
+        Display* display;
     } app_instance;
-
-    // X11 window instance.
-    typedef Window wnd_instance;
-    #define WND_NULL 0
 
     // X11 coordinate.
     typedef int coord;

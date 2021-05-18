@@ -18,10 +18,6 @@ namespace nice {
         return ::GetCurrentProcessId();
     }
 
-    std::string app::name() {
-        return std::filesystem::path(args[0]).stem().string();
-    }
-
     bool app::is_primary_instance() {
         // Are we already primary instance? If not, try to become one.
         if (!primary_) {

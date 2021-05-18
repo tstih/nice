@@ -25,6 +25,10 @@ namespace nice {
     void app::instance(app_instance instance) {
         instance_ = instance;
     }
+
+    std::string app::name() {
+        return std::filesystem::path(args[0]).stem().string();
+    }
 //{{END.DEF}}
 
 }
