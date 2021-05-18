@@ -34,14 +34,14 @@ namespace nice {
         // Store window to window list.
         wmap_.insert(std::pair<Window,native_wnd*>(winst_, this));
         // Set initial title.
-        XSetStandardProperties(display_,winst_,title.c_str(),NULL,None,NULL,0,NULL);
+        ::XSetStandardProperties(display_,winst_,title.c_str(),NULL,None,NULL,0,NULL);
 
         // Rather strange handling of close window by X11.
         Atom atom = XInternAtom ( display_,"WM_DELETE_WINDOW", false );
-        XSetWMProtocols(display_, winst_, &atom, 1);
+        ::XSetWMProtocols(display_, winst_, &atom, 1);
 
         // TODO: Implement lazy subscription (somday)
-        XSelectInput (display_, winst_,
+        ::XSelectInput (display_, winst_,
 			ExposureMask | ButtonPressMask | ButtonReleaseMask | EnterWindowMask | 
             LeaveWindowMask | PointerMotionMask | FocusChangeMask | KeyPressMask |
             KeyReleaseMask | SubstructureNotifyMask | StructureNotifyMask | 

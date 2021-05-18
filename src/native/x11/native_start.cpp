@@ -15,7 +15,9 @@ extern void program();
 
 int main(int argc, char* argv[]) {
     // X Windows initialization code.
-    nice::app::instance(XOpenDisplay(NULL));
+    nice::app_instance inst;
+    inst.display=::XOpenDisplay(NULL);
+    nice::app::instance(inst);
 
     // Copy cmd line arguments to vector.
     nice::app::args = std::vector<std::string>(argv, argv + argc);
@@ -27,7 +29,7 @@ int main(int argc, char* argv[]) {
     program();
     
     // Close display.
-    XCloseDisplay(nice::app::instance());
+    ::XCloseDisplay(inst.display);
 
     // And return return code;
     return nice::app::ret_code;

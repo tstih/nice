@@ -14,7 +14,7 @@ namespace nice {
 
 //{{BEGIN.DEF}}
     // Static variable.
-    std::map<Window,native_wnd*> wmap_;
+    std::map<Window,native_wnd*> native_wnd::wmap_;
 
     native_wnd::native_wnd(wnd *window) {
         window_=window;
