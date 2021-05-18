@@ -26,7 +26,12 @@ export CXXFLAGS		= -std=c++2a -I$(INC_DIR) -I$(LIB_DIR) -g
 x11: nice $(SAMPLES)
 
 .PHONY: nice
-nice: dirs tools $(NICELIB) 
+nice: rmnice dirs tools $(NICELIB) 
+
+# Remove current nice single header.
+.PHONY: rmnice
+rmnice:
+	$(RM) $(NICELIB)
 
 # Create the tmp folder.
 .PHONY: dirs
@@ -50,4 +55,3 @@ $(SAMPLES):
 .PHONY: clean
 clean:
 	$(RMDIR) $(BUILD_DIR)
-	$(RM) $(NICELIB)
