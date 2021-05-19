@@ -88,8 +88,6 @@ The build command is
 make x11
 ~~~
 
-Other options for Linux (at time of writing) are: `gtk`.
-
 # Status
 
 ## Done
@@ -97,11 +95,10 @@ Other options for Linux (at time of writing) are: `gtk`.
  * transformed into single header library
  * ms windows binding
  * refactoring no 1
- * GTK3 binding
+ * X11 binding
  * mapping window messages to C++ signals
  * basic paint proof of concept
  * refactoring no 2
- * X11 binding
  * scribble app
 
 ## Implementing
@@ -120,13 +117,15 @@ Other options for Linux (at time of writing) are: `gtk`.
 
 Part 1: [Nice application.](https://github.com/tstih/nice/tree/master/doc/lesson1)
 
-Part 2: [Basic windows.](https://github.com/tstih/nice/tree/master/doc/lesson2)
+Part 2: The build system
 
-Part 3: [Window message routing, and painting.](https://github.com/tstih/nice/tree/master/doc/lesson3)
+Part 3: Basic windows.
 
-Part 4: [Porting nice to a new platform: X11](https://github.com/tstih/nice/tree/master/doc/lesson4)
+Part 4: Window message routing, and painting.
 
-Part 5: [The Scrible!](https://github.com/tstih/nice/tree/master/doc/lesson5)
+Part 5: Porting nice to a new platform: X11
+
+Part 6: The Scrible!
 
 Part 6: Child windows and layout managers (unfinished)
 
@@ -162,6 +161,10 @@ An early effort to separate native code from the pure nice classes (for Microsof
 featured a lot of friend functions. After initial refactoring they were replaced by static 
 member functions. Friends are just not friends when it comes to inheritance.
 
+## Closely coupled window and native window class
+
+We decoupled window and native window classes by using the *PImpl* pattern after
+the coupled classes became a real mess. 
 
 # Links
 

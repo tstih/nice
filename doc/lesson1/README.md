@@ -11,7 +11,7 @@ to the operating system. A zero return value signals success
 and any other value could indicate an error.
 
 Some operating systems don't follow this convention. For example, 
-MS Windows main entry point of a desktop application is a function
+MS Windows main entry point of a desktop application is 
 called `WinMain()`. 
 
 Having different entry points on each platform would defeat our 
@@ -29,7 +29,7 @@ void program()
 ~~~
 
 Obviously this will not work out of the box hence our library needs 
-to provide some glue for that. The first task for our framework is to 
+to provide the glue for that. The first task for our framework is to 
 rewire the platform specific application entry point to unified (multiplatofrm) 
 application entry point.
 
@@ -48,7 +48,7 @@ to return application name.
 
 extern void program();
 
-namespace ni {
+namespace nice {
     class app {
     public:
         static std::vector<std::string> args;
@@ -69,8 +69,12 @@ Now let's add the real `main()` function to our framework. Inside it we'll
 first populate the app structure, and then pass control to our `program()` 
 function.
 
+ > Nice is a multiplatform library. For this lesson, let's pretend
+ > that we are developing code for Microsoft Windows and the X11 and use
+ > macros `__WIN__` and `__X11__` to differentiate between the platforms. 
+
 ~~~cpp
-#if _WIN32
+#if __WIN__
 int WINAPI WinMain(
     _In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
@@ -80,21 +84,21 @@ int WINAPI WinMain(
     // Store cmd line arguments to vector.
     int argc = __argc;
     char** argv = __argv;
-#elif __unix__
+#elif __X11__
 int main(int argc, char* argv[]) {
 #endif
     // Copy cmd line arguments to vector.
-    ni::app::args = std::vector<std::string>(argv, argv + argc);
+    nice::app::args = std::vector<std::string>(argv, argv + argc);
 
     // Run program.
     ::program();
 
     // And return return code;
-    return ni::app::ret_code;
+    return nice::app::ret_code;
 }
 ~~~
 
-What's going on here? First we separate Windows and Linux specific implementation 
+What's going on here? First we separate Windows and X11 specific implementation 
 details by using the preprocessor. We copy command line arguments to a vector named
 `args`. And then we forward control to our `program()` function. Finally,
 we pick the `ret_code` from the app class, and use it as the application 
@@ -110,7 +114,7 @@ which points to the raw command line arguments. But we do it with a little help
 of our friends the `__argv` and `__argc`, which point to classic C command line 
 arguments.
 
-One of the coolest features of Windows was providing our start up function with 
+One of the coolest features of Windows was providing our main function with 
 the application handle of currently running application, and previous application handle
 if one has already been running. This is what `hInstance`, and `hPrevInstance` were all about.
 They were giving us a unique application identifier and ability to check if an instance
@@ -128,10 +132,10 @@ identifier.
 So let's implement this logic.
 
 ~~~cpp
-#if _WIN32
+#if __WIN__
     typedef DWORD  app_id; 
     typedef HINSTANCE app_instance;
-#elif __unix__ 
+#elif __X11__ 
     typedef pid_t app_id;
     typedef voidn* app_instance; // Reserved for Lesson 2.
 #endif
@@ -157,14 +161,14 @@ std::vector<std::string> app::args;
 
 ### Unique application id
 
-On unix we can obtain process id by calling the `getpid()`, and on Windows we have
+On Unix we can obtain process id by calling the `getpid()`, and on Windows we have
 the `GetCurrentProcessId()` function for that.
 
 ~~~cpp
 app_id app::id() {
-#if _WIN32
+#if __WIN__
     return ::GetCurrentProcessId();
-#elif __unix__
+#elif __X11__
     return ::getpid();
 #endif
 }
@@ -201,14 +205,14 @@ bool app::is_primary_instance() {
     // Are we already primary instance? If not, try to become one.
     if (!primary_) {
         std::string aname = app::name();
-#if _WIN32
+#if __WIN__
         // Create local mutex.
         std::ostringstream name;
         name << "Local\\" << aname;
         ::CreateMutex(0, FALSE, name.str().data());
         // We are primary instance.
         primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
-#elif __unix__
+#elif __X11__
         // Pid file needs to go to /var/run
         std::ostringstream pfname, pid;
         pfname << "/tmp/" << aname << ".pid";
@@ -246,17 +250,21 @@ class to gain access to its private members, and we do the assignment inside `Wi
 In this first lesson you learned how nice is initialized, what the application class offers 
 to you and how platform specific code is isolated.
 
-Next week we will write about windows.
+In next lesson we'll learn all about our build system and how we create
+a single header file from multiple files.
 
 ## Listing
 
 ~~~cpp
 extern "C" {
-#if _WIN32
+#if __WIN__
 #include <windows.h>
-#elif __unix__
+#elif __X11__
 #include <sys/file.h>
+// A trick to prevent conflict with the nice() function.
+#define nice nicefn
 #include <unistd.h>
+#undef nice
 #endif
 }
 #include <vector>
@@ -265,12 +273,12 @@ extern "C" {
 
 extern void program();
 
-namespace ni {
+namespace nice {
 
-#if _WIN32
+#if __WIN__
     typedef DWORD  app_id;
     typedef HINSTANCE app_instance;
-#elif __unix__ 
+#elif __X11__ 
     typedef pid_t app_id;
 #endif
 
@@ -298,13 +306,13 @@ namespace ni {
         static bool primary_;
         static app_instance instance_;
 
-#if _WIN32
+#if __WIN__
         friend int WINAPI ::WinMain(
             _In_ HINSTANCE hInstance,
             _In_opt_ HINSTANCE hPrevInstance,
             _In_ LPSTR lpCmdLine,
             _In_ int nShowCmd);
-#elif __unix__
+#elif __X11__
         friend int ::main(int argc, char* argv[]);
 #endif
     };
@@ -324,9 +332,9 @@ namespace ni {
     }
 
     app_id app::id() {
-#if _WIN32
+#if __WIN__
         return ::GetCurrentProcessId();
-#elif __unix__
+#elif __X11__
         return ::getpid();
 #endif
     }
@@ -334,14 +342,14 @@ namespace ni {
         // Are we already primary instance? If not, try to become one.
         if (!primary_) {
             std::string aname = app::name();
-#if _WIN32
+#if __WIN__
             // Create local mutex.
             std::ostringstream name;
             name << "Local\\" << aname;
             ::CreateMutex(0, FALSE, name.str().data());
             // We are primary instance.
             primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
-#elif __unix__
+#elif __X11__
             // Pid file needs to go to /var/run
             std::ostringstream pfname, pid;
             pfname << "/tmp/" << aname << ".pid";
@@ -362,7 +370,7 @@ namespace ni {
     }
 }
 
-#if _WIN32
+#if __WIN__
 int WINAPI WinMain(
     _In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
@@ -373,26 +381,24 @@ int WINAPI WinMain(
     int argc = __argc;
     char** argv = __argv;
 
-    ni::app::instance_ = hInstance;
+    nice::app::instance_ = hInstance;
 
-#elif __unix__
+#elif __X11__
 int main(int argc, char* argv[]) {
 #endif
 
     // Copy cmd line arguments to vector.
-    ni::app::args = std::vector<std::string>(argv, argv + argc);
+    nice::app::args = std::vector<std::string>(argv, argv + argc);
 
     // Try becoming primary instance...
-    ni::app::is_primary_instance();
+    nice::app::is_primary_instance();
 
     // Run program.
     program();
 
     // And return return code;
-    return ni::app::ret_code;
+    return nice::app::ret_code;
 }
-
-using namespace ni;
 
 void program() {
     // Your code here.

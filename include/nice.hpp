@@ -888,11 +888,11 @@ namespace nice {
             {
             mouse_info mi = {
                 { e.xmotion.x, e.xmotion.y },
-                e.xbutton.button&Button1, // lmrcsa
-                e.xbutton.button&Button2,
-                e.xbutton.button&Button3,
-                e.xbutton.state&ControlMask,
-                e.xbutton.state&ShiftMask
+                (bool)(e.xbutton.button&Button1), 
+                (bool)(e.xbutton.button&Button2),
+                (bool)(e.xbutton.button&Button3),
+                (bool)(e.xbutton.state&ControlMask),
+                (bool)(e.xbutton.state&ShiftMask)
             };
             if (e.type==ButtonPress)
                 window_->mouse_down.emit(mi);
@@ -904,11 +904,11 @@ namespace nice {
             {
             mouse_info mi = {
                 { e.xmotion.x, e.xmotion.y },
-                e.xmotion.state&Button1Mask, // lmrcsa
-                e.xmotion.state&Button2Mask,
-                e.xmotion.state&Button3Mask,
-                e.xmotion.state&ControlMask,
-                e.xmotion.state&ShiftMask
+                (bool)(e.xmotion.state&Button1Mask), 
+                (bool)(e.xmotion.state&Button2Mask),
+                (bool)(e.xmotion.state&Button3Mask),
+                (bool)(e.xmotion.state&ControlMask),
+                (bool)(e.xmotion.state&ShiftMask)
             };
             window_->mouse_move.emit(mi);
             }
