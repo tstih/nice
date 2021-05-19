@@ -478,19 +478,6 @@ namespace nice {
     std::string app::name() {
         return std::filesystem::path(args[0]).stem().string();
     }
-    void wnd::repaint(void) { native()->repaint(); }
-    
-    std::string wnd::get_title() { return native()->get_title(); }
-    
-    void wnd::set_title(std::string s) { native()->set_title(s); } 
-    
-    size wnd::get_wsize() { return native()->get_wsize(); }
-    
-    void wnd::set_wsize(size sz) { native()->set_wsize(sz); } 
-    
-    pt wnd::get_location() { return native()->get_location(); }
-    
-    void wnd::set_location(pt location) { native()->set_location(location); } 
     bool app_wnd::on_destroy() {
         // Destroy native window.
         native()->destroy();
@@ -507,27 +494,58 @@ namespace nice {
     void app_wnd::show() {
         native()->show();
     }
+    void wnd::repaint(void) { native()->repaint(); }
+    
+    std::string wnd::get_title() { return native()->get_title(); }
+    
+    void wnd::set_title(std::string s) { native()->set_title(s); } 
+    
+    size wnd::get_wsize() { return native()->get_wsize(); }
+    
+    void wnd::set_wsize(size sz) { native()->set_wsize(sz); } 
+    
+    pt wnd::get_location() { return native()->get_location(); }
+    
+    void wnd::set_location(pt location) { native()->set_location(location); } 
 
 
 #ifdef __WIN__
 
-    void artist::draw_line(color c, pt p1, pt p2) const {
-        HPEN pen = ::CreatePen(PS_SOLID, 1, RGB(c.r, c.g, c.b));
-        ::SelectObject(canvas_, pen);
-        POINT pt;
-        ::MoveToEx(canvas_, p1.x, p1.y, &pt);
-        ::LineTo(canvas_, p2.x, p2.y);
-        ::DeleteObject(pen);
+    app_id app::id() {
+        return ::GetCurrentProcessId();
     }
 
-    void artist::draw_rect(color c, rct r) const {
-        RECT rect{ r.left, r.top, r.x2(), r.y2() };
-        HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
-        ::FrameRect(canvas_, &rect, brush);
-        ::DeleteObject(brush);
+    bool app::is_primary_instance() {
+        // Are we already primary instance? If not, try to become one.
+        if (!primary_) {
+            std::string aname = app::name();
+            // Create local mutex.
+            std::ostringstream name;
+            name << "Local\\" << aname;
+            ::CreateMutex(0, FALSE, name.str().c_str());
+            // We are primary instance.
+            primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
+        }
+        return primary_;
     }
 
-    void artist::fill_rect(color c, rct r) const {   
+    void app::run(const app_wnd& w) {
+
+        // We have to cast the constness away to 
+        // call non-const functions on window.
+        auto& main_wnd=const_cast<app_wnd &>(w);
+        main_wnd.show();
+
+        // Message loop.
+        MSG msg;
+        while (::GetMessage(&msg, NULL, 0, 0))
+        {
+            ::TranslateMessage(&msg);
+            ::DispatchMessage(&msg);
+        }
+
+        // Finally, set the return code.
+        ret_code = (int)msg.wParam;
     }
     native_app_wnd::native_app_wnd(
         app_wnd *window,
@@ -570,6 +588,24 @@ namespace nice {
 
     void native_app_wnd::show() const { 
         ::ShowWindow(hwnd_, SW_SHOWNORMAL); 
+    }
+    void artist::draw_line(color c, pt p1, pt p2) const {
+        HPEN pen = ::CreatePen(PS_SOLID, 1, RGB(c.r, c.g, c.b));
+        ::SelectObject(canvas_, pen);
+        POINT pt;
+        ::MoveToEx(canvas_, p1.x, p1.y, &pt);
+        ::LineTo(canvas_, p2.x, p2.y);
+        ::DeleteObject(pen);
+    }
+
+    void artist::draw_rect(color c, rct r) const {
+        RECT rect{ r.left, r.top, r.x2(), r.y2() };
+        HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
+        ::FrameRect(canvas_, &rect, brush);
+        ::DeleteObject(brush);
+    }
+
+    void artist::fill_rect(color c, rct r) const {   
     }
     void native_wnd::destroy(void) {
         ::PostQuitMessage(0);
@@ -712,20 +748,32 @@ namespace nice {
             return 0;
 
     }
+
+#elif __X11__
+
     app_id app::id() {
-        return ::GetCurrentProcessId();
+        return ::getpid();
     }
 
     bool app::is_primary_instance() {
         // Are we already primary instance? If not, try to become one.
         if (!primary_) {
             std::string aname = app::name();
-            // Create local mutex.
-            std::ostringstream name;
-            name << "Local\\" << aname;
-            ::CreateMutex(0, FALSE, name.str().c_str());
-            // We are primary instance.
-            primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
+
+            // Pid file needs to go to /var/run
+            std::ostringstream pfname, pid;
+            pfname << "/tmp/" << aname << ".pid";
+            pid << nice::app::id() << std::endl;
+
+            // Open, lock, and forget. Let the OS close and unlock.
+            int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
+            int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
+            primary_ = !(rc && EWOULDBLOCK == errno);
+            if (primary_) {
+                // Write our process id into the file.
+                ::write(pfd, pid.str().c_str(), pid.str().length());
+                return false;
+            }
         }
         return primary_;
     }
@@ -735,31 +783,21 @@ namespace nice {
         // We have to cast the constness away to 
         // call non-const functions on window.
         auto& main_wnd=const_cast<app_wnd &>(w);
+
+        // Show the window.
         main_wnd.show();
 
-        // Message loop.
-        MSG msg;
-        while (::GetMessage(&msg, NULL, 0, 0))
-        {
-            ::TranslateMessage(&msg);
-            ::DispatchMessage(&msg);
-        }
+        // Flush it all.
+        ::XFlush(instance_.display);
 
-        // Finally, set the return code.
-        ret_code = (int)msg.wParam;
-    }
-
-#elif __X11__
-
-    void artist::draw_line(color c, pt p1, pt p2) const {
-        
-    }
-
-    void artist::draw_rect(color c, rct r) const {
-        
-    }
-
-    void artist::fill_rect(color c, rct r) const {   
+        // Main event loop.
+        XEvent e;
+        bool quit=false;
+	    while ( !quit ) // Will be interrupted by the OS.
+	    {
+	      ::XNextEvent ( instance_.display,&e );
+	      quit = native_wnd::global_wnd_proc(e);
+	    }
     }
     native_app_wnd::native_app_wnd(
         app_wnd *window,
@@ -800,6 +838,16 @@ namespace nice {
 
     void native_app_wnd::show() const { 
         ::XMapWindow(display_, winst_);
+    }
+    void artist::draw_line(color c, pt p1, pt p2) const {
+        
+    }
+
+    void artist::draw_rect(color c, rct r) const {
+        
+    }
+
+    void artist::fill_rect(color c, rct r) const {   
     }
     // Static variable.
     std::map<Window,native_wnd*> native_wnd::wmap_;
@@ -919,54 +967,6 @@ namespace nice {
             break;
         } // switch
         return quit;
-    }
-    app_id app::id() {
-        return ::getpid();
-    }
-
-    bool app::is_primary_instance() {
-        // Are we already primary instance? If not, try to become one.
-        if (!primary_) {
-            std::string aname = app::name();
-
-            // Pid file needs to go to /var/run
-            std::ostringstream pfname, pid;
-            pfname << "/tmp/" << aname << ".pid";
-            pid << nice::app::id() << std::endl;
-
-            // Open, lock, and forget. Let the OS close and unlock.
-            int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
-            int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
-            primary_ = !(rc && EWOULDBLOCK == errno);
-            if (primary_) {
-                // Write our process id into the file.
-                ::write(pfd, pid.str().c_str(), pid.str().length());
-                return false;
-            }
-        }
-        return primary_;
-    }
-
-    void app::run(const app_wnd& w) {
-
-        // We have to cast the constness away to 
-        // call non-const functions on window.
-        auto& main_wnd=const_cast<app_wnd &>(w);
-
-        // Show the window.
-        main_wnd.show();
-
-        // Flush it all.
-        ::XFlush(instance_.display);
-
-        // Main event loop.
-        XEvent e;
-        bool quit=false;
-	    while ( !quit ) // Will be interrupted by the OS.
-	    {
-	      ::XNextEvent ( instance_.display,&e );
-	      quit = native_wnd::global_wnd_proc(e);
-	    }
     }
 
 #endif

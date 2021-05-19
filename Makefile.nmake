@@ -28,6 +28,8 @@ nice: dirs tools $(NICELIB)
 # Create the tmp folder.
 dirs:
 	$(MKDIR) $(BUILD_DIR) $(NO_ERR)
+	$(RM) $(NICELIB) $(NO_ERR)
+	$(RMDIR) $(INC_DIR) $(NO_ERR)
 	$(MKDIR) $(INC_DIR) $(NO_ERR)
 
 # Create the sm tool.
@@ -56,5 +58,3 @@ $(BUILD_DIR)\minimal.obj: $(SAMPLES)\1_minimal.cpp
 	
 clean:
 	$(RMDIR) $(BUILD_DIR) $(NO_ERR)
-	$(RMDIR) $(INC_DIR) $(NO_ERR)
-	$(RM) $(NICELIB) $(NO_ERR)
