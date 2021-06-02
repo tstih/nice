@@ -25,6 +25,9 @@ export CXXFLAGS		= -std=c++2a -I$(INC_DIR) -I$(LIB_DIR) -g
 .PHONY: x11
 x11: nice $(SAMPLES)
 
+.PHONY: sdl
+sdl: nice $(SAMPLES)
+
 .PHONY: nice
 nice: rmnice dirs tools $(NICELIB) 
 

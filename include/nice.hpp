@@ -3,10 +3,10 @@
  * 
  * (Single) header file for the nice GUI library.
  * 
- * (c) 2020 Tomaz Stih
+ * (c) 2020 - 2021 Tomaz Stih
  * This code is licensed under MIT license (see LICENSE.txt for details).
  * 
- * 18.12.2020   tstih
+ * 02.06.2021   tstih
  * 
  */
 #ifndef _NICE_HPP
@@ -30,6 +30,18 @@ extern "C" {
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xos.h>
+}
+
+#elif __SDL__
+extern "C" {
+#define nice unix_nice
+#include <unistd.h>
+#undef nice
+#include <stdint.h>
+#include <fcntl.h>
+#include <sys/file.h>
+
+#include <SDL2/SDL.h>
 }
 
 #endif
@@ -81,6 +93,22 @@ namespace nice {
         Window w;
         GC gc;
     } canvas;
+
+#elif __SDL__
+    // Unix process id.
+    typedef pid_t app_id;
+
+    // Basic X11 stuff.
+    typedef int app_instance;
+
+    // X11 coordinate.
+    typedef int coord;
+
+    // 8 bit integer.
+    typedef uint8_t byte;
+
+    // X11 GC and required stuff.
+    typedef SDL_Surface* canvas;
 
 #endif
 
@@ -263,6 +291,17 @@ namespace nice {
         canvas canvas_;
     };
 
+    class raster {
+    public:
+        // Constructs a new raster.        
+        raster(int width, int height);
+        // Destructs the raster.
+        virtual ~raster();
+    private:
+        int width_, height_, stride_, len_;
+        std::unique_ptr<uint8_t> data_;
+    };
+
 #ifdef __WIN__
     class wnd; // Forward declaration.
     class native_wnd {
@@ -340,6 +379,56 @@ namespace nice {
         static std::map<Window,native_wnd*> wmap_;
         // Local window procdure.
         virtual bool local_wnd_proc(const XEvent& e);
+        // Pointer to related non-native window struct.
+        wnd* window_;
+    };
+
+    class app_wnd; // Forward declaration.
+    class native_app_wnd : public native_wnd {
+    public:
+        native_app_wnd(
+            app_wnd *window,
+            std::string title,
+            size size
+        );
+        virtual ~native_app_wnd();
+        void show() const;
+    };
+
+#elif __SDL__
+    class wnd; // Forward declaration.
+    class native_wnd {
+    public:
+        // Ctor creates X11 window. 
+        native_wnd(wnd *window);
+        // Dtor.
+        virtual ~native_wnd();
+        // Destroy native window.
+        void destroy(void);
+        // Invalidate native window.
+        void repaint(void);
+        // Get window title.
+        std::string get_title();
+        // Set window title.
+        void set_title(std::string s);
+        // Get window size (not client size). 
+        size get_wsize();
+        // Set window size.
+        void set_wsize(size sz);
+        // Get window relative location (to parent)
+        // or absolute location if parent is screen. 
+        pt get_location();
+        // Set window location.
+        void set_location(pt location);
+        // Global window procedure (static)
+        static bool global_wnd_proc(const SDL_Event& e);
+    protected:
+        // Native SDL window structure.
+        SDL_Window* winst_; 
+        // A map from X11 window to native_wnd.
+        static std::map<SDL_Window *,native_wnd*> wmap_;
+        // Local window procdure.
+        virtual bool local_wnd_proc(const SDL_Event& e);
         // Pointer to related non-native window struct.
         wnd* window_;
     };
@@ -478,6 +567,19 @@ namespace nice {
     std::string app::name() {
         return std::filesystem::path(args[0]).stem().string();
     }
+    void wnd::repaint(void) { native()->repaint(); }
+    
+    std::string wnd::get_title() { return native()->get_title(); }
+    
+    void wnd::set_title(std::string s) { native()->set_title(s); } 
+    
+    size wnd::get_wsize() { return native()->get_wsize(); }
+    
+    void wnd::set_wsize(size sz) { native()->set_wsize(sz); } 
+    
+    pt wnd::get_location() { return native()->get_location(); }
+    
+    void wnd::set_location(pt location) { native()->set_location(location); } 
     bool app_wnd::on_destroy() {
         // Destroy native window.
         native()->destroy();
@@ -494,58 +596,41 @@ namespace nice {
     void app_wnd::show() {
         native()->show();
     }
-    void wnd::repaint(void) { native()->repaint(); }
     
-    std::string wnd::get_title() { return native()->get_title(); }
-    
-    void wnd::set_title(std::string s) { native()->set_title(s); } 
-    
-    size wnd::get_wsize() { return native()->get_wsize(); }
-    
-    void wnd::set_wsize(size sz) { native()->set_wsize(sz); } 
-    
-    pt wnd::get_location() { return native()->get_location(); }
-    
-    void wnd::set_location(pt location) { native()->set_location(location); } 
+    raster::raster(int width, int height) : 
+        width_(width), 
+        height_(height),
+        stride_(width%sizeof(uint8_t)) {
+        
+        // Calculate raster length.
+        len_=stride_ * height;
+        // Allocate memory.
+        data_=std::make_unique<uint8_t>(len_);
+    }
+
+    raster::~raster() {}
+
 
 
 #ifdef __WIN__
 
-    app_id app::id() {
-        return ::GetCurrentProcessId();
+    void artist::draw_line(color c, pt p1, pt p2) const {
+        HPEN pen = ::CreatePen(PS_SOLID, 1, RGB(c.r, c.g, c.b));
+        ::SelectObject(canvas_, pen);
+        POINT pt;
+        ::MoveToEx(canvas_, p1.x, p1.y, &pt);
+        ::LineTo(canvas_, p2.x, p2.y);
+        ::DeleteObject(pen);
     }
 
-    bool app::is_primary_instance() {
-        // Are we already primary instance? If not, try to become one.
-        if (!primary_) {
-            std::string aname = app::name();
-            // Create local mutex.
-            std::ostringstream name;
-            name << "Local\\" << aname;
-            ::CreateMutex(0, FALSE, name.str().c_str());
-            // We are primary instance.
-            primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
-        }
-        return primary_;
+    void artist::draw_rect(color c, rct r) const {
+        RECT rect{ r.left, r.top, r.x2(), r.y2() };
+        HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
+        ::FrameRect(canvas_, &rect, brush);
+        ::DeleteObject(brush);
     }
 
-    void app::run(const app_wnd& w) {
-
-        // We have to cast the constness away to 
-        // call non-const functions on window.
-        auto& main_wnd=const_cast<app_wnd &>(w);
-        main_wnd.show();
-
-        // Message loop.
-        MSG msg;
-        while (::GetMessage(&msg, NULL, 0, 0))
-        {
-            ::TranslateMessage(&msg);
-            ::DispatchMessage(&msg);
-        }
-
-        // Finally, set the return code.
-        ret_code = (int)msg.wParam;
+    void artist::fill_rect(color c, rct r) const {   
     }
     native_app_wnd::native_app_wnd(
         app_wnd *window,
@@ -588,24 +673,6 @@ namespace nice {
 
     void native_app_wnd::show() const { 
         ::ShowWindow(hwnd_, SW_SHOWNORMAL); 
-    }
-    void artist::draw_line(color c, pt p1, pt p2) const {
-        HPEN pen = ::CreatePen(PS_SOLID, 1, RGB(c.r, c.g, c.b));
-        ::SelectObject(canvas_, pen);
-        POINT pt;
-        ::MoveToEx(canvas_, p1.x, p1.y, &pt);
-        ::LineTo(canvas_, p2.x, p2.y);
-        ::DeleteObject(pen);
-    }
-
-    void artist::draw_rect(color c, rct r) const {
-        RECT rect{ r.left, r.top, r.x2(), r.y2() };
-        HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
-        ::FrameRect(canvas_, &rect, brush);
-        ::DeleteObject(brush);
-    }
-
-    void artist::fill_rect(color c, rct r) const {   
     }
     void native_wnd::destroy(void) {
         ::PostQuitMessage(0);
@@ -748,32 +815,20 @@ namespace nice {
             return 0;
 
     }
-
-#elif __X11__
-
     app_id app::id() {
-        return ::getpid();
+        return ::GetCurrentProcessId();
     }
 
     bool app::is_primary_instance() {
         // Are we already primary instance? If not, try to become one.
         if (!primary_) {
             std::string aname = app::name();
-
-            // Pid file needs to go to /var/run
-            std::ostringstream pfname, pid;
-            pfname << "/tmp/" << aname << ".pid";
-            pid << nice::app::id() << std::endl;
-
-            // Open, lock, and forget. Let the OS close and unlock.
-            int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
-            int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
-            primary_ = !(rc && EWOULDBLOCK == errno);
-            if (primary_) {
-                // Write our process id into the file.
-                ::write(pfd, pid.str().c_str(), pid.str().length());
-                return false;
-            }
+            // Create local mutex.
+            std::ostringstream name;
+            name << "Local\\" << aname;
+            ::CreateMutex(0, FALSE, name.str().c_str());
+            // We are primary instance.
+            primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
         }
         return primary_;
     }
@@ -783,21 +838,31 @@ namespace nice {
         // We have to cast the constness away to 
         // call non-const functions on window.
         auto& main_wnd=const_cast<app_wnd &>(w);
-
-        // Show the window.
         main_wnd.show();
 
-        // Flush it all.
-        ::XFlush(instance_.display);
+        // Message loop.
+        MSG msg;
+        while (::GetMessage(&msg, NULL, 0, 0))
+        {
+            ::TranslateMessage(&msg);
+            ::DispatchMessage(&msg);
+        }
 
-        // Main event loop.
-        XEvent e;
-        bool quit=false;
-	    while ( !quit ) // Will be interrupted by the OS.
-	    {
-	      ::XNextEvent ( instance_.display,&e );
-	      quit = native_wnd::global_wnd_proc(e);
-	    }
+        // Finally, set the return code.
+        ret_code = (int)msg.wParam;
+    }
+
+#elif __X11__
+
+    void artist::draw_line(color c, pt p1, pt p2) const {
+        
+    }
+
+    void artist::draw_rect(color c, rct r) const {
+        
+    }
+
+    void artist::fill_rect(color c, rct r) const {   
     }
     native_app_wnd::native_app_wnd(
         app_wnd *window,
@@ -838,16 +903,6 @@ namespace nice {
 
     void native_app_wnd::show() const { 
         ::XMapWindow(display_, winst_);
-    }
-    void artist::draw_line(color c, pt p1, pt p2) const {
-        
-    }
-
-    void artist::draw_rect(color c, rct r) const {
-        
-    }
-
-    void artist::fill_rect(color c, rct r) const {   
     }
     // Static variable.
     std::map<Window,native_wnd*> native_wnd::wmap_;
@@ -968,6 +1023,210 @@ namespace nice {
         } // switch
         return quit;
     }
+    app_id app::id() {
+        return ::getpid();
+    }
+
+    bool app::is_primary_instance() {
+        // Are we already primary instance? If not, try to become one.
+        if (!primary_) {
+            std::string aname = app::name();
+
+            // Pid file needs to go to /var/run
+            std::ostringstream pfname, pid;
+            pfname << "/tmp/" << aname << ".pid";
+            pid << nice::app::id() << std::endl;
+
+            // Open, lock, and forget. Let the OS close and unlock.
+            int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
+            int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
+            primary_ = !(rc && EWOULDBLOCK == errno);
+            if (primary_) {
+                // Write our process id into the file.
+                ::write(pfd, pid.str().c_str(), pid.str().length());
+                return false;
+            }
+        }
+        return primary_;
+    }
+
+    void app::run(const app_wnd& w) {
+
+        // We have to cast the constness away to 
+        // call non-const functions on window.
+        auto& main_wnd=const_cast<app_wnd &>(w);
+
+        // Show the window.
+        main_wnd.show();
+
+        // Flush it all.
+        ::XFlush(instance_.display);
+
+        // Main event loop.
+        XEvent e;
+        bool quit=false;
+	    while ( !quit ) // Will be interrupted by the OS.
+	    {
+	      ::XNextEvent ( instance_.display,&e );
+	      quit = native_wnd::global_wnd_proc(e);
+	    }
+    }
+
+#elif __SDL__
+
+    void artist::draw_line(color c, pt p1, pt p2) const {
+        
+    }
+
+    void artist::draw_rect(color c, rct r) const {
+        
+    }
+
+    void artist::fill_rect(color c, rct r) const {   
+    }
+    native_app_wnd::native_app_wnd(
+        app_wnd *window,
+        std::string title,
+        size size
+    ) : native_wnd(window) {
+        /* Create window. In screen coordinates. */
+        winst_ = ::SDL_CreateWindow(title.c_str(), 
+            SDL_WINDOWPOS_UNDEFINED, 
+            SDL_WINDOWPOS_UNDEFINED, 
+            size.w, 
+            size.h, 
+            SDL_WINDOW_HIDDEN);
+
+        // Store window to window list.
+        wmap_.insert(std::pair<SDL_Window*,native_wnd*>(winst_, this));
+    }
+
+    native_app_wnd::~native_app_wnd() {}
+
+    void native_app_wnd::show() const { 
+        ::SDL_ShowWindow(winst_);
+    }
+    // Static variable.
+    std::map<SDL_Window*,native_wnd*> native_wnd::wmap_;
+
+    native_wnd::native_wnd(wnd *window) {
+        window_=window;
+    }
+
+    native_wnd::~native_wnd() {
+        // And lazy destroy. 
+        ::SDL_DestroyWindow(winst_);
+    }
+
+    void native_wnd::repaint() {
+        // TODO: Whatever.
+    }
+
+    void native_wnd::set_title(std::string s) {
+        ::SDL_SetWindowTitle(winst_, s.c_str());
+    };
+    
+    std::string native_wnd::get_title() {
+        return SDL_GetWindowTitle(winst_);
+    }
+
+    size native_wnd::get_wsize() {
+        int w,h;
+        ::SDL_GetWindowSize(winst_, &w, &h);
+        return { w, h };
+    }
+
+    void native_wnd::set_wsize(size sz) {
+        // TODO: Check SDL_GetRendererOutputSize
+        ::SDL_SetWindowSize(winst_, sz.w, sz.h);
+    }
+
+    pt native_wnd::get_location() {
+        int x,y;
+        SDL_GetWindowPosition(winst_, &x, &y);
+        return { x, y };
+    }
+
+    void native_wnd::set_location(pt location) {
+        SDL_SetWindowPosition(winst_,location.x, location.y);
+    }
+
+    void native_wnd::destroy() {
+        // Remove me from windows map.
+        wmap_.erase (winst_); 
+    }
+
+    // TODO:for now SDL only has one window so we're
+    // assuming the first entry in the map, but we're
+    // ready for more!
+    bool native_wnd::global_wnd_proc(const SDL_Event& e) {
+        native_wnd* nw = wmap_.begin()->second;
+        return nw->local_wnd_proc(e);
+    }
+
+    // Local (per window) window proc.
+    bool native_wnd::local_wnd_proc(const SDL_Event& e) {
+        bool quit=false;
+        // TODO: process events and delegate to signals.
+        return quit;
+    }
+    app_id app::id() {
+        return ::getpid();
+    }
+
+    bool app::is_primary_instance() {
+        // Are we already primary instance? If not, try to become one.
+        if (!primary_) {
+            std::string aname = app::name();
+
+            // Pid file needs to go to /var/run
+            std::ostringstream pfname, pid;
+            pfname << "/tmp/" << aname << ".pid";
+            pid << nice::app::id() << std::endl;
+
+            // Open, lock, and forget. Let the OS close and unlock.
+            int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
+            int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
+            primary_ = !(rc && EWOULDBLOCK == errno);
+            if (primary_) {
+                // Write our process id into the file.
+                ::write(pfd, pid.str().c_str(), pid.str().length());
+                return false;
+            }
+        }
+        return primary_;
+    }
+
+    void app::run(const app_wnd& w) {
+
+        // Show the main window.
+        auto& main_wnd=const_cast<app_wnd &>(w);
+        main_wnd.show();
+
+
+        /*
+        w = SDL_CreateWindow("zwin simulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_HIDDEN);
+        if (w == NULL)
+            printf("window could not be created: %s\n", SDL_GetError());
+        else
+        {
+            SDL_SetWindowSize(w, SCREEN_WIDTH, SCREEN_HEIGHT);
+            SDL_ShowWindow(w);
+        */
+
+        // Main event loop.
+        SDL_Event e;
+        /* Clean the queue */
+        bool quit=false;
+        while (!quit) { 
+            // Wait for something to happen.
+            SDL_WaitEvent(&e);
+            /* User requested quit? */
+            if (e.type == SDL_QUIT)
+                quit = true;
+        }
+
+    }
 
 #endif
 
@@ -1020,6 +1279,36 @@ int main(int argc, char* argv[]) {
     
     // Close display.
     ::XCloseDisplay(inst.display);
+
+    // And return return code;
+    return nice::app::ret_code;
+}
+
+#elif __SDL__
+extern void program();
+
+int main(int argc, char* argv[]) {
+
+    // Init SDL.
+    if (::SDL_Init(SDL_INIT_VIDEO) < 0) {
+        throw_ex(nice::nice_exception,"SDL could not initialize.");
+    }
+
+    // TODO: Initialize application.
+    nice::app_instance inst=0;
+    nice::app::instance(inst);
+
+    // Copy cmd line arguments to vector.
+    nice::app::args = std::vector<std::string>(argv, argv + argc);
+
+    // Try becoming primary instance...
+    nice::app::is_primary_instance();
+    
+    // Run program.
+    program();
+    
+    // Exit SDL.
+    ::SDL_Quit();
 
     // And return return code;
     return nice::app::ret_code;
