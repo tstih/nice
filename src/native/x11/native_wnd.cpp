@@ -33,13 +33,20 @@ namespace nice {
     void native_wnd::set_title(std::string s) {
         ::XStoreName(display_, winst_, s.c_str());
     };
-    
+     
     std::string native_wnd::get_title() {
-        // XFetchName and XFree...
+        char * name;
+        ::XFetchName(display_,winst_, &name);
+        std::string wname=name;
+        ::XFree(name);
+        return wname;
     }
 
     size native_wnd::get_wsize() {
-        // XGetWindowAttributes
+        XWindowAttributes wattr;
+        ::XGetWindowAttributes(display_,winst_,&wattr);
+        // TODO: I think this is just the client area?
+        return { wattr.width, wattr.height };
     }
 
     void native_wnd::set_wsize(size sz) {
@@ -47,6 +54,10 @@ namespace nice {
     }
 
     pt native_wnd::get_location() {
+        XWindowAttributes wattr;
+        ::XGetWindowAttributes(display_,winst_,&wattr);
+        // TODO: I think this is just the client area?
+        return { wattr.x, wattr.y };
     }
 
     void native_wnd::set_location(pt location) {
