@@ -29,6 +29,7 @@ namespace nice {
         void set_wsize(size sz);
         pt get_location();
         void set_location(pt location);
+        rct get_paint_area();
     protected:
         // Window variables.
         HWND hwnd_;

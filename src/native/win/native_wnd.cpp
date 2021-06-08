@@ -69,6 +69,12 @@ namespace nice {
             wr.bottom-wr.top+1, TRUE);
     }
 
+    rct native_wnd::get_paint_area() {
+        RECT client;
+        ::GetClientRect(hwnd_, &client);
+        return { client.left, client.top, client.right, client.bottom };
+    }
+
     LRESULT CALLBACK native_wnd::global_wnd_proc(
         HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
         

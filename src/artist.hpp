@@ -11,6 +11,8 @@
 #ifndef _ARTIST_HPP
 #define _ARTIST_HPP
 
+#include "raster.hpp"
+
 namespace nice {
 
 //{{BEGIN.DEC}}
@@ -20,12 +22,11 @@ namespace nice {
         artist(const canvas& canvas) {
             canvas_ = canvas;
         }
-
         // Methods.
         void draw_line(color c, pt p1, pt p2) const;
         void draw_rect(color c, rct r) const;
         void fill_rect(color c, rct r) const;
-
+        void draw_raster(const raster& rst, pt p) const;
     private:
         // Passed canvas.
         canvas canvas_;

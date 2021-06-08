@@ -21,11 +21,19 @@ namespace nice {
     public:
         // Constructs a new raster.        
         raster(int width, int height);
+        // Construct a raster from resource.
+        raster(int width, int height, const uint8_t * bgrarr);
         // Destructs the raster.
         virtual ~raster();
+        // Width.
+        int width() const;
+        // Height.
+        int height() const;
+        // Pointer to raw data.
+        uint8_t* raw() const;
     private:
-        int width_, height_, stride_, len_;
-        std::unique_ptr<uint8_t> data_;
+        int width_, height_, len_;
+        std::unique_ptr<uint8_t[]> raw_; // We own this!
     };
 //{{END.DEC}}
 } // namespace nice

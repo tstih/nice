@@ -30,6 +30,32 @@ namespace nice {
     }
 
     void artist::fill_rect(color c, rct r) const {   
+        RECT rect{ r.left, r.top, r.x2(), r.y2() };
+        HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
+        ::FillRect(canvas_, &rect, brush);
+        ::DeleteObject(brush);
+    }
+
+    // Know how from: https://www-user.tu-chemnitz.de/~heha/petzold/ch14e.htm
+    // http://www.winprog.org/tutorial/bitmaps.html
+    // http://www.fengyuan.com/article/alphablend.html
+    void artist::draw_raster(const raster& rst, pt p) const {
+        BITMAPINFO bmi;
+        ::ZeroMemory(&bmi, sizeof(BITMAPINFO));
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = rst.width();
+        bmi.bmiHeader.biHeight = -(rst.height()); // Windows magic. Rasters are bottom up.
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 24;
+        bmi.bmiHeader.biCompression = BI_RGB; // But it is really BGR!
+        ::SetDIBitsToDevice(canvas_,
+            p.x, p.y, rst.width(), rst.height(),
+            0, 0,
+            0, rst.height(), 
+            rst.raw(),
+            &bmi,
+            DIB_RGB_COLORS
+        );
     }
 //{{END.DEF}}
 }

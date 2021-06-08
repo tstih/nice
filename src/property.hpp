@@ -17,6 +17,17 @@ namespace nice {
 
 //{{BEGIN.DEC}}
     template<typename T>
+    class ro_property {
+    public:
+        ro_property(
+            std::function<T()> getter) :
+            getter_(getter) { }
+        operator T() const { return getter_(); }
+    private:
+        std::function<T()> getter_;
+    };
+
+    template<typename T>
     class property {
     public:
         property(

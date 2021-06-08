@@ -25,5 +25,7 @@ namespace nice {
     pt wnd::get_location() { return native()->get_location(); }
     
     void wnd::set_location(pt location) { native()->set_location(location); } 
+
+    rct wnd::get_paint_area() { return native()->get_paint_area(); };
 //{{END.DEF}}
 }

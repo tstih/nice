@@ -41,6 +41,10 @@ namespace nice {
             [this]() -> pt {  return this->get_location(); }
         };
 
+        ro_property<rct> paint_area{
+            [this]() -> rct { return this->get_paint_area(); }
+        };
+
         // Signals.
         signal<> created;
         signal<> destroyed;
@@ -58,6 +62,7 @@ namespace nice {
         virtual void set_wsize(size sz);
         virtual pt get_location();
         virtual void set_location(pt location);
+        virtual rct get_paint_area();
 
         // Pimpl. Concrete window must implement this!
         virtual native_wnd* native() = 0;

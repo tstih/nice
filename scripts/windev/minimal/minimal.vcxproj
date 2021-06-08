@@ -19,7 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\samples\1_minimal.cpp" />
+    <ClCompile Include="..\..\..\samples\2_raster.cpp" />
+    <ClCompile Include="..\..\..\samples\tut_raster.cpp" />
     <ClCompile Include="..\..\..\src\app.cpp" />
     <ClCompile Include="..\..\..\src\app_wnd.cpp" />
     <ClCompile Include="..\..\..\src\native\win\native_app.cpp" />
@@ -27,6 +28,7 @@
     <ClCompile Include="..\..\..\src\native\win\native_artist.cpp" />
     <ClCompile Include="..\..\..\src\native\win\native_start.cpp" />
     <ClCompile Include="..\..\..\src\native\win\native_wnd.cpp" />
+    <ClCompile Include="..\..\..\src\raster.cpp" />
     <ClCompile Include="..\..\..\src\wnd.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -38,7 +40,9 @@
     <ClInclude Include="..\..\..\src\includes.hpp" />
     <ClInclude Include="..\..\..\src\literals.hpp" />
     <ClInclude Include="..\..\..\src\mouse_info.hpp" />
+    <ClInclude Include="..\..\..\src\native\win\native_wnd.hpp" />
     <ClInclude Include="..\..\..\src\property.hpp" />
+    <ClInclude Include="..\..\..\src\raster.hpp" />
     <ClInclude Include="..\..\..\src\resized_info.hpp" />
     <ClInclude Include="..\..\..\src\resource.hpp" />
     <ClInclude Include="..\..\..\src\signal.hpp" />
