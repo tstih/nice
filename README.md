@@ -186,6 +186,9 @@ User defined literals
 PIMPL for GUI
  * https://stackoverflow.com/questions/35191894/pimpl-with-inheritance-using-smart-pointer
 
+X Windows Samples
+ * https://www.lemoda.net/c/index.html
+
 
 [language.url]:   https://isocpp.org/
 [language.badge]: https://img.shields.io/badge/language-C++-blue.svg

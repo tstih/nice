@@ -25,5 +25,8 @@ namespace nice {
 
     void artist::fill_rect(color c, rct r) const {   
     }
+
+    void artist::draw_raster(const raster& rst, pt p) const {
+    }
 //{{END.DEF}}
 }

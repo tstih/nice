@@ -220,6 +220,17 @@ namespace nice {
     };
 
     template<typename T>
+    class ro_property {
+    public:
+        ro_property(
+            std::function<T()> getter) :
+            getter_(getter) { }
+        operator T() const { return getter_(); }
+    private:
+        std::function<T()> getter_;
+    };
+
+    template<typename T>
     class property {
     public:
         property(
@@ -259,6 +270,25 @@ namespace nice {
         coord y2() { return top + height; }
     } rct;
 
+    class raster {
+    public:
+        // Constructs a new raster.        
+        raster(int width, int height);
+        // Construct a raster from resource.
+        raster(int width, int height, const uint8_t * bgrarr);
+        // Destructs the raster.
+        virtual ~raster();
+        // Width.
+        int width() const;
+        // Height.
+        int height() const;
+        // Pointer to raw data.
+        uint8_t* raw() const;
+    private:
+        int width_, height_, len_;
+        std::unique_ptr<uint8_t[]> raw_; // We own this!
+    };
+
     struct resized_info {
         coord width;
         coord height;
@@ -280,26 +310,14 @@ namespace nice {
         artist(const canvas& canvas) {
             canvas_ = canvas;
         }
-
         // Methods.
         void draw_line(color c, pt p1, pt p2) const;
         void draw_rect(color c, rct r) const;
         void fill_rect(color c, rct r) const;
-
+        void draw_raster(const raster& rst, pt p) const;
     private:
         // Passed canvas.
         canvas canvas_;
-    };
-
-    class raster {
-    public:
-        // Constructs a new raster.        
-        raster(int width, int height);
-        // Destructs the raster.
-        virtual ~raster();
-    private:
-        int width_, height_, stride_, len_;
-        std::unique_ptr<uint8_t> data_;
     };
 
 #ifdef __WIN__
@@ -318,6 +336,7 @@ namespace nice {
         void set_wsize(size sz);
         pt get_location();
         void set_location(pt location);
+        rct get_paint_area();
     protected:
         // Window variables.
         HWND hwnd_;
@@ -368,6 +387,8 @@ namespace nice {
         pt get_location();
         // Set window location.
         void set_location(pt location);
+        // Get window paint rectangle.
+        rct get_paint_area();
         // Global window procedure (static)
         static bool global_wnd_proc(const XEvent& e);
     protected:
@@ -381,6 +402,9 @@ namespace nice {
         virtual bool local_wnd_proc(const XEvent& e);
         // Pointer to related non-native window struct.
         wnd* window_;
+        // Cached size.
+        size cached_wsize_;
+        GC cached_gc_ {0};
     };
 
     class app_wnd; // Forward declaration.
@@ -420,6 +444,8 @@ namespace nice {
         pt get_location();
         // Set window location.
         void set_location(pt location);
+        // Get window paint rectangle.
+        rct get_paint_area();
         // Global window procedure (static)
         static bool global_wnd_proc(const SDL_Event& e);
     protected:
@@ -467,6 +493,10 @@ namespace nice {
             [this]() -> pt {  return this->get_location(); }
         };
 
+        ro_property<rct> paint_area{
+            [this]() -> rct { return this->get_paint_area(); }
+        };
+
         // Signals.
         signal<> created;
         signal<> destroyed;
@@ -484,6 +514,7 @@ namespace nice {
         virtual void set_wsize(size sz);
         virtual pt get_location();
         virtual void set_location(pt location);
+        virtual rct get_paint_area();
 
         // Pimpl. Concrete window must implement this!
         virtual native_wnd* native() = 0;
@@ -580,6 +611,8 @@ namespace nice {
     pt wnd::get_location() { return native()->get_location(); }
     
     void wnd::set_location(pt location) { native()->set_location(location); } 
+
+    rct wnd::get_paint_area() { return native()->get_paint_area(); };
     bool app_wnd::on_destroy() {
         // Destroy native window.
         native()->destroy();
@@ -599,17 +632,33 @@ namespace nice {
     
     raster::raster(int width, int height) : 
         width_(width), 
-        height_(height),
-        stride_(width%sizeof(uint8_t)) {
+        height_(height) {
         
         // Calculate raster length.
-        len_=stride_ * height;
+        len_ = width * height * 3;
         // Allocate memory.
-        data_=std::make_unique<uint8_t>(len_);
+        raw_=std::make_unique<uint8_t[]>(len_+1);
+    }
+
+    raster::raster(int width, int height, const uint8_t* bgrarr) :
+        raster(width,height) {
+        // Copy BGR array.
+        std::copy(bgrarr, bgrarr + len_, raw_.get());
     }
 
     raster::~raster() {}
 
+    int raster::width() const {
+        return width_;
+    }
+
+    int raster::height() const {
+        return height_;
+    }
+
+    uint8_t* raster::raw() const {
+        return raw_.get();
+    }
 
 
 #ifdef __WIN__
@@ -631,6 +680,32 @@ namespace nice {
     }
 
     void artist::fill_rect(color c, rct r) const {   
+        RECT rect{ r.left, r.top, r.x2(), r.y2() };
+        HBRUSH brush = ::CreateSolidBrush(RGB(c.r, c.g, c.b));
+        ::FillRect(canvas_, &rect, brush);
+        ::DeleteObject(brush);
+    }
+
+    // Know how from: https://www-user.tu-chemnitz.de/~heha/petzold/ch14e.htm
+    // http://www.winprog.org/tutorial/bitmaps.html
+    // http://www.fengyuan.com/article/alphablend.html
+    void artist::draw_raster(const raster& rst, pt p) const {
+        BITMAPINFO bmi;
+        ::ZeroMemory(&bmi, sizeof(BITMAPINFO));
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = rst.width();
+        bmi.bmiHeader.biHeight = -(rst.height()); // Windows magic. Rasters are bottom up.
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 24;
+        bmi.bmiHeader.biCompression = BI_RGB; // But it is really BGR!
+        ::SetDIBitsToDevice(canvas_,
+            p.x, p.y, rst.width(), rst.height(),
+            0, 0,
+            0, rst.height(), 
+            rst.raw(),
+            &bmi,
+            DIB_RGB_COLORS
+        );
     }
     native_app_wnd::native_app_wnd(
         app_wnd *window,
@@ -728,6 +803,12 @@ namespace nice {
             location.top, 
             wr.right-wr.left+1, 
             wr.bottom-wr.top+1, TRUE);
+    }
+
+    rct native_wnd::get_paint_area() {
+        RECT client;
+        ::GetClientRect(hwnd_, &client);
+        return { client.left, client.top, client.right, client.bottom };
     }
 
     LRESULT CALLBACK native_wnd::global_wnd_proc(
@@ -855,14 +936,30 @@ namespace nice {
 #elif __X11__
 
     void artist::draw_line(color c, pt p1, pt p2) const {
-        
     }
 
-    void artist::draw_rect(color c, rct r) const {
-        
+    void artist::draw_rect(color c, rct r) const {   
     }
 
     void artist::fill_rect(color c, rct r) const {   
+
+        auto screen=DefaultScreen(canvas_.d);
+
+        Colormap cmap=DefaultColormap(canvas_.d,screen);    
+        XColor xcolour;
+
+        // I guess XParseColor will work here
+        xcolour.red = 32000; xcolour.green = 65000; xcolour.blue = 32000;
+        xcolour.flags = DoRed | DoGreen | DoBlue;
+        XAllocColor(canvas_.d, cmap, &xcolour);
+
+        XSetForeground(canvas_.d, canvas_.gc, xcolour.pixel);
+
+        // TODO:
+        XFillRectangle( canvas_.d, canvas_.w, canvas_.gc, r.x, r.y, 200, 200 );
+    }
+
+    void artist::draw_raster(const raster& rst, pt p) const {
     }
     native_app_wnd::native_app_wnd(
         app_wnd *window,
@@ -910,11 +1007,19 @@ namespace nice {
     native_wnd::native_wnd(wnd *window) {
         window_=window;
         display_=app::instance().display;
+        // TODO: pass size.
+        cached_wsize_={0,0}; // Used to recognize resize events.
     }
 
     native_wnd::~native_wnd() {
         // And lazy destroy. We could do this in the destroy() function.
+        if (cached_gc_!=0) XFreeGC(display_,cached_gc_);
         XDestroyWindow(display_, winst_); winst_=0;
+    }
+
+    void native_wnd::destroy() {
+        // Remove me from windows map.
+        wmap_.erase (winst_); 
     }
 
     void native_wnd::repaint() {
@@ -955,9 +1060,9 @@ namespace nice {
         XMoveWindow(display_,winst_, location.left, location.top);
     }
 
-    void native_wnd::destroy() {
-        // Remove me from windows map.
-        wmap_.erase (winst_); 
+    // TODO: Implement.
+    rct native_wnd::get_paint_area() {
+        return { 0,0,0,0 };
     }
 
     // Static (global) window proc. For all classes -
@@ -988,13 +1093,12 @@ namespace nice {
             break;
         case Expose:
             {
-                canvas c { 
-                    display_, 
-                    winst_, 
-                    XCreateGC(display_, winst_, 0, NULL) }; 
+                // Need to create the gc?
+                if (cached_gc_==0)
+                    cached_gc_= XCreateGC(display_, winst_, 0, NULL); 
+                canvas c { display_, winst_, cached_gc_};
                 artist a(c);
                 window_->paint.emit(a);
-                XFreeGC(display_,c.gc);
             }
 		    break;
         case ButtonPress: // https://tronche.com/gui/x/xlib/events/keyboard-pointer/keyboard-pointer.html
@@ -1027,10 +1131,18 @@ namespace nice {
             window_->mouse_move.emit(mi);
             }
             break;
-        case KeyPress:
+        case ConfigureNotify:
+            {
+            XConfigureEvent xce = e.xconfigure;
+            // Size change?
+            if (xce.width!=cached_wsize_.w || xce.height!=cached_wsize_.h) {
+                cached_wsize_.w=xce.width;
+                cached_wsize_.h=xce.height;
+                window_->resized.emit({xce.width,xce.height});
+            }
+            }
             break;
-        case KeyRelease:
-            break;
+        // TODO: KeyPress, KeyRelease
         } // switch
         return quit;
     }
@@ -1095,6 +1207,9 @@ namespace nice {
 
     void artist::fill_rect(color c, rct r) const {   
     }
+
+    void artist::draw_raster(const raster& rst, pt p) const {
+    }
     native_app_wnd::native_app_wnd(
         app_wnd *window,
         std::string title,
@@ -1127,6 +1242,11 @@ namespace nice {
     native_wnd::~native_wnd() {
         // And lazy destroy. 
         ::SDL_DestroyWindow(winst_);
+    }
+
+    void native_wnd::destroy() {
+        // Remove me from windows map.
+        wmap_.erase (winst_); 
     }
 
     void native_wnd::repaint() {
@@ -1162,9 +1282,9 @@ namespace nice {
         SDL_SetWindowPosition(winst_,location.x, location.y);
     }
 
-    void native_wnd::destroy() {
-        // Remove me from windows map.
-        wmap_.erase (winst_); 
+    // TODO: Implement.
+    rct native_wnd::get_paint_area() {
+        return { 0,0,0,0 };
     }
 
     // TODO:for now SDL only has one window so we're

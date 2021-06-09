@@ -8,7 +8,7 @@ extern uint8_t tut_raster[];
 
 class main_wnd : public app_wnd {
 public:
-    main_wnd() : app_wnd("Raster", { 800,600 })
+    main_wnd() : app_wnd("Raster", { 320,200 })
     {
         paint.connect(this, &main_wnd::on_paint);
     }

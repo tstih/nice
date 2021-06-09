@@ -19,11 +19,19 @@ namespace nice {
     native_wnd::native_wnd(wnd *window) {
         window_=window;
         display_=app::instance().display;
+        // TODO: pass size.
+        cached_wsize_={0,0}; // Used to recognize resize events.
     }
 
     native_wnd::~native_wnd() {
         // And lazy destroy. We could do this in the destroy() function.
+        if (cached_gc_!=0) XFreeGC(display_,cached_gc_);
         XDestroyWindow(display_, winst_); winst_=0;
+    }
+
+    void native_wnd::destroy() {
+        // Remove me from windows map.
+        wmap_.erase (winst_); 
     }
 
     void native_wnd::repaint() {
@@ -64,9 +72,9 @@ namespace nice {
         XMoveWindow(display_,winst_, location.left, location.top);
     }
 
-    void native_wnd::destroy() {
-        // Remove me from windows map.
-        wmap_.erase (winst_); 
+    // TODO: Implement.
+    rct native_wnd::get_paint_area() {
+        return { 0,0,0,0 };
     }
 
     // Static (global) window proc. For all classes -
@@ -97,13 +105,12 @@ namespace nice {
             break;
         case Expose:
             {
-                canvas c { 
-                    display_, 
-                    winst_, 
-                    XCreateGC(display_, winst_, 0, NULL) }; 
+                // Need to create the gc?
+                if (cached_gc_==0)
+                    cached_gc_= XCreateGC(display_, winst_, 0, NULL); 
+                canvas c { display_, winst_, cached_gc_};
                 artist a(c);
                 window_->paint.emit(a);
-                XFreeGC(display_,c.gc);
             }
 		    break;
         case ButtonPress: // https://tronche.com/gui/x/xlib/events/keyboard-pointer/keyboard-pointer.html
@@ -136,10 +143,18 @@ namespace nice {
             window_->mouse_move.emit(mi);
             }
             break;
-        case KeyPress:
+        case ConfigureNotify:
+            {
+            XConfigureEvent xce = e.xconfigure;
+            // Size change?
+            if (xce.width!=cached_wsize_.w || xce.height!=cached_wsize_.h) {
+                cached_wsize_.w=xce.width;
+                cached_wsize_.h=xce.height;
+                window_->resized.emit({xce.width,xce.height});
+            }
+            }
             break;
-        case KeyRelease:
-            break;
+        // TODO: KeyPress, KeyRelease
         } // switch
         return quit;
     }

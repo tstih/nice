@@ -5,7 +5,7 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/minimal",
+            "program": "${workspaceFolder}/build/raster",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

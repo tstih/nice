@@ -25,6 +25,11 @@ namespace nice {
         ::SDL_DestroyWindow(winst_);
     }
 
+    void native_wnd::destroy() {
+        // Remove me from windows map.
+        wmap_.erase (winst_); 
+    }
+
     void native_wnd::repaint() {
         // TODO: Whatever.
     }
@@ -58,9 +63,9 @@ namespace nice {
         SDL_SetWindowPosition(winst_,location.x, location.y);
     }
 
-    void native_wnd::destroy() {
-        // Remove me from windows map.
-        wmap_.erase (winst_); 
+    // TODO: Implement.
+    rct native_wnd::get_paint_area() {
+        return { 0,0,0,0 };
     }
 
     // TODO:for now SDL only has one window so we're

@@ -42,6 +42,8 @@ namespace nice {
         pt get_location();
         // Set window location.
         void set_location(pt location);
+        // Get window paint rectangle.
+        rct get_paint_area();
         // Global window procedure (static)
         static bool global_wnd_proc(const SDL_Event& e);
     protected:

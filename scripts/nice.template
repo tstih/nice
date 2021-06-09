@@ -38,10 +38,10 @@ namespace nice {
 {{$INCLUDE DEC resource.hpp}}
 {{$INCLUDE DEC property.hpp}}
 {{$INCLUDE DEC geometry.hpp}}
+{{$INCLUDE DEC raster.hpp}}
 {{$INCLUDE DEC resized_info.hpp}}
 {{$INCLUDE DEC mouse_info.hpp}}
 {{$INCLUDE DEC artist.hpp}}
-{{$INCLUDE DEC raster.hpp}}
 #ifdef __WIN__
 {{$INCLUDE DEC native/win/native_wnd.hpp}}
 {{$INCLUDE DEC native/win/native_app_wnd.hpp}}

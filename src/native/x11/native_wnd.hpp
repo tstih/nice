@@ -42,6 +42,8 @@ namespace nice {
         pt get_location();
         // Set window location.
         void set_location(pt location);
+        // Get window paint rectangle.
+        rct get_paint_area();
         // Global window procedure (static)
         static bool global_wnd_proc(const XEvent& e);
     protected:
@@ -55,6 +57,9 @@ namespace nice {
         virtual bool local_wnd_proc(const XEvent& e);
         // Pointer to related non-native window struct.
         wnd* window_;
+        // Cached size.
+        size cached_wsize_;
+        GC cached_gc_ {0};
     };
 //{{END.DEC}}
 
