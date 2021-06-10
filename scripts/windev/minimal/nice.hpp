@@ -18,6 +18,7 @@
 #include "resource.hpp"
 #include "property.hpp"
 #include "geometry.hpp"
+#include "native/win/native_raster.hpp"
 #include "raster.hpp"
 #include "resized_info.hpp"
 #include "mouse_info.hpp"

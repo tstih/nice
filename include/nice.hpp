@@ -271,6 +271,24 @@ namespace nice {
     } rct;
 
 #ifdef __WIN__
+    class native_raster {
+    public:
+        // Construct a raster from resource.
+        native_raster(int width, int height, const uint8_t *bgra);
+        // Allocate resource.
+        native_raster(int width, int height);  
+        virtual ~native_raster();
+        // Width.
+        int width() const;
+        // Height.
+        int height() const;
+        // Pointer to raw data.
+        uint8_t* raw() const;
+    private:
+        int width_, height_, len_;
+        std::unique_ptr<uint8_t[]> raw_; // We own this!
+    };
+
 #elif __X11__
     class native_raster {
     public:
@@ -624,21 +642,6 @@ namespace nice {
     std::string app::name() {
         return std::filesystem::path(args[0]).stem().string();
     }
-    void wnd::repaint(void) { native()->repaint(); }
-    
-    std::string wnd::get_title() { return native()->get_title(); }
-    
-    void wnd::set_title(std::string s) { native()->set_title(s); } 
-    
-    size wnd::get_wsize() { return native()->get_wsize(); }
-    
-    void wnd::set_wsize(size sz) { native()->set_wsize(sz); } 
-    
-    pt wnd::get_location() { return native()->get_location(); }
-    
-    void wnd::set_location(pt location) { native()->set_location(location); } 
-
-    rct wnd::get_paint_area() { return native()->get_paint_area(); };
     bool app_wnd::on_destroy() {
         // Destroy native window.
         native()->destroy();
@@ -655,10 +658,103 @@ namespace nice {
     void app_wnd::show() {
         native()->show();
     }
+    void wnd::repaint(void) { native()->repaint(); }
+    
+    std::string wnd::get_title() { return native()->get_title(); }
+    
+    void wnd::set_title(std::string s) { native()->set_title(s); } 
+    
+    size wnd::get_wsize() { return native()->get_wsize(); }
+    
+    void wnd::set_wsize(size sz) { native()->set_wsize(sz); } 
+    
+    pt wnd::get_location() { return native()->get_location(); }
+    
+    void wnd::set_location(pt location) { native()->set_location(location); } 
+
+    rct wnd::get_paint_area() { return native()->get_paint_area(); };
 
 
 #ifdef __WIN__
 
+    app_id app::id() {
+        return ::GetCurrentProcessId();
+    }
+
+    bool app::is_primary_instance() {
+        // Are we already primary instance? If not, try to become one.
+        if (!primary_) {
+            std::string aname = app::name();
+            // Create local mutex.
+            std::ostringstream name;
+            name << "Local\\" << aname;
+            ::CreateMutex(0, FALSE, name.str().c_str());
+            // We are primary instance.
+            primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
+        }
+        return primary_;
+    }
+
+    void app::run(const app_wnd& w) {
+
+        // We have to cast the constness away to 
+        // call non-const functions on window.
+        auto& main_wnd=const_cast<app_wnd &>(w);
+        main_wnd.show();
+
+        // Message loop.
+        MSG msg;
+        while (::GetMessage(&msg, NULL, 0, 0))
+        {
+            ::TranslateMessage(&msg);
+            ::DispatchMessage(&msg);
+        }
+
+        // Finally, set the return code.
+        ret_code = (int)msg.wParam;
+    }
+    native_app_wnd::native_app_wnd(
+        app_wnd *window,
+        std::string title,
+        size size
+    ) : native_wnd(window) {
+
+        // Create app window.
+        class_ = app::name();
+
+        // Register window.
+        ::ZeroMemory(&wcex_, sizeof(WNDCLASSEX));
+        wcex_.cbSize = sizeof(WNDCLASSEX);
+        wcex_.lpfnWndProc = global_wnd_proc;
+        wcex_.hInstance = app::instance();
+        wcex_.lpszClassName = class_.c_str();
+        wcex_.hCursor = ::LoadCursor(NULL, IDC_ARROW);
+
+        if (!::RegisterClassEx(&wcex_)) 
+            throw_ex(nice_exception,"Unable to register class.");
+
+        // Create it.
+        hwnd_ = ::CreateWindowEx(
+            0,
+            class_.c_str(),
+            title.c_str(),
+            WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT, CW_USEDEFAULT,
+            size.width, size.height,
+            NULL,
+            NULL,
+            app::instance(),
+            this);
+
+        if (!hwnd_)
+            throw_ex(nice_exception,"Unable to create window.");
+    }
+
+    native_app_wnd::~native_app_wnd() {}
+
+    void native_app_wnd::show() const { 
+        ::ShowWindow(hwnd_, SW_SHOWNORMAL); 
+    }
     void artist::draw_line(color c, pt p1, pt p2) const {
         HPEN pen = ::CreatePen(PS_SOLID, 1, RGB(c.r, c.g, c.b));
         ::SelectObject(canvas_, pen);
@@ -703,47 +799,42 @@ namespace nice {
             DIB_RGB_COLORS
         );
     }
-    native_app_wnd::native_app_wnd(
-        app_wnd *window,
-        std::string title,
-        size size
-    ) : native_wnd(window) {
+    native_raster::native_raster(int width, int height, const uint8_t *bgra) :
+        native_raster(width,height) {
+        // For windows we need 24 bit BGR array.
+        uint8_t *dst=raw_.get();
+        for (int i=0; i<width*height; i++) {
+            int srci=4*i, dsti=3*i;
+            dst[dsti] = bgra[srci];
+            dst[dsti+1] = bgra[srci+1];
+            dst[dsti+2] = bgra[srci+2];
+        }
+    }
+    
+    native_raster::native_raster(int width, int height) :
+        width_(width), 
+        height_(height) {
 
-        // Create app window.
-        class_ = app::name();
+        // Calculate raster length.
+        len_ = width * height * 3; // BGRA!
+        // Allocate memory.
+        raw_=std::make_unique<uint8_t[]>(len_);
+    }  
 
-        // Register window.
-        ::ZeroMemory(&wcex_, sizeof(WNDCLASSEX));
-        wcex_.cbSize = sizeof(WNDCLASSEX);
-        wcex_.lpfnWndProc = global_wnd_proc;
-        wcex_.hInstance = app::instance();
-        wcex_.lpszClassName = class_.c_str();
-        wcex_.hCursor = ::LoadCursor(NULL, IDC_ARROW);
+    native_raster::~native_raster() {
 
-        if (!::RegisterClassEx(&wcex_)) 
-            throw_ex(nice_exception,"Unable to register class.");
-
-        // Create it.
-        hwnd_ = ::CreateWindowEx(
-            0,
-            class_.c_str(),
-            title.c_str(),
-            WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT, CW_USEDEFAULT,
-            size.width, size.height,
-            NULL,
-            NULL,
-            app::instance(),
-            this);
-
-        if (!hwnd_)
-            throw_ex(nice_exception,"Unable to create window.");
     }
 
-    native_app_wnd::~native_app_wnd() {}
+    int native_raster::width() const {
+        return width_;
+    }
 
-    void native_app_wnd::show() const { 
-        ::ShowWindow(hwnd_, SW_SHOWNORMAL); 
+    int native_raster::height() const {
+        return height_;
+    }
+
+    uint8_t* native_raster::raw() const {
+        return raw_.get();
     }
     void native_wnd::destroy(void) {
         ::PostQuitMessage(0);
@@ -892,20 +983,32 @@ namespace nice {
             return 0;
 
     }
+
+#elif __X11__
+
     app_id app::id() {
-        return ::GetCurrentProcessId();
+        return ::getpid();
     }
 
     bool app::is_primary_instance() {
         // Are we already primary instance? If not, try to become one.
         if (!primary_) {
             std::string aname = app::name();
-            // Create local mutex.
-            std::ostringstream name;
-            name << "Local\\" << aname;
-            ::CreateMutex(0, FALSE, name.str().c_str());
-            // We are primary instance.
-            primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
+
+            // Pid file needs to go to /var/run
+            std::ostringstream pfname, pid;
+            pfname << "/tmp/" << aname << ".pid";
+            pid << nice::app::id() << std::endl;
+
+            // Open, lock, and forget. Let the OS close and unlock.
+            int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
+            int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
+            primary_ = !(rc && EWOULDBLOCK == errno);
+            if (primary_) {
+                // Write our process id into the file.
+                ::write(pfd, pid.str().c_str(), pid.str().length());
+                return false;
+            }
         }
         return primary_;
     }
@@ -915,22 +1018,62 @@ namespace nice {
         // We have to cast the constness away to 
         // call non-const functions on window.
         auto& main_wnd=const_cast<app_wnd &>(w);
+
+        // Show the window.
         main_wnd.show();
 
-        // Message loop.
-        MSG msg;
-        while (::GetMessage(&msg, NULL, 0, 0))
-        {
-            ::TranslateMessage(&msg);
-            ::DispatchMessage(&msg);
-        }
+        // Flush it all.
+        ::XFlush(instance_.display);
 
-        // Finally, set the return code.
-        ret_code = (int)msg.wParam;
+        // Main event loop.
+        XEvent e;
+        bool quit=false;
+	    while ( !quit ) // Will be interrupted by the OS.
+	    {
+	      ::XNextEvent ( instance_.display,&e );
+	      quit = native_wnd::global_wnd_proc(e);
+	    }
+    }
+    native_app_wnd::native_app_wnd(
+        app_wnd *window,
+        std::string title,
+        size size
+    ) : native_wnd(window) {
+
+        int s = DefaultScreen(display_);
+        winst_ = ::XCreateSimpleWindow(
+            display_, 
+            RootWindow(display_, s), 
+            10, // x 
+            10, // y
+            size.width, 
+            size.height, 
+            1, // border width
+            BlackPixel(display_, s), // border color
+            WhitePixel(display_, s)  // background color
+        );
+        // Store window to window list.
+        wmap_.insert(std::pair<Window,native_wnd*>(winst_, this));
+        // Set initial title.
+        ::XSetStandardProperties(display_,winst_,title.c_str(),NULL,None,NULL,0,NULL);
+
+        // Rather strange handling of close window by X11.
+        Atom atom = XInternAtom ( display_,"WM_DELETE_WINDOW", false );
+        ::XSetWMProtocols(display_, winst_, &atom, 1);
+
+        // TODO: Implement lazy subscription (somday)
+        ::XSelectInput (display_, winst_,
+			ExposureMask | ButtonPressMask | ButtonReleaseMask | EnterWindowMask | 
+            LeaveWindowMask | PointerMotionMask | FocusChangeMask | KeyPressMask |
+            KeyReleaseMask | SubstructureNotifyMask | StructureNotifyMask | 
+            SubstructureRedirectMask);
     }
 
-#elif __X11__
+    native_app_wnd::~native_app_wnd() {}
 
+    void native_app_wnd::show() const { 
+        ::XMapWindow(display_, winst_);
+    }
     void artist::draw_line(color c, pt p1, pt p2) const {
     }
 
@@ -980,45 +1123,45 @@ namespace nice {
         // Destroy the image.
         XDestroyImage(img);
     }
-    native_app_wnd::native_app_wnd(
-        app_wnd *window,
-        std::string title,
-        size size
-    ) : native_wnd(window) {
+    native_raster::native_raster(int width, int height, const uint8_t *rgba) :
+        native_raster(width,height) {
+        // Copy BGR array.
+        // TODO: Update.
+        uint8_t *dst=raw_.get();
+        for (int i=0; i<width*height; i++) {
+            int srci=3*i, dsti=4*i;
 
-        int s = DefaultScreen(display_);
-        winst_ = ::XCreateSimpleWindow(
-            display_, 
-            RootWindow(display_, s), 
-            10, // x 
-            10, // y
-            size.width, 
-            size.height, 
-            1, // border width
-            BlackPixel(display_, s), // border color
-            WhitePixel(display_, s)  // background color
-        );
-        // Store window to window list.
-        wmap_.insert(std::pair<Window,native_wnd*>(winst_, this));
-        // Set initial title.
-        ::XSetStandardProperties(display_,winst_,title.c_str(),NULL,None,NULL,0,NULL);
+            dst[dsti] = rgba[srci];
+            dst[dsti+1] = rgba[srci+1];
+            dst[dsti+2] = rgba[srci+2];
+            dst[dsti+3] = 0;
+        }
+    }
+    
+    native_raster::native_raster(int width, int height) :
+        width_(width), 
+        height_(height) {
 
-        // Rather strange handling of close window by X11.
-        Atom atom = XInternAtom ( display_,"WM_DELETE_WINDOW", false );
-        ::XSetWMProtocols(display_, winst_, &atom, 1);
+        // Calculate raster length.
+        len_ = width * height * 4; // ARGB!
+        // Allocate memory.
+        raw_=std::make_unique<uint8_t[]>(len_+1);
+    }  
 
-        // TODO: Implement lazy subscription (somday)
-        ::XSelectInput (display_, winst_,
-			ExposureMask | ButtonPressMask | ButtonReleaseMask | EnterWindowMask | 
-            LeaveWindowMask | PointerMotionMask | FocusChangeMask | KeyPressMask |
-            KeyReleaseMask | SubstructureNotifyMask | StructureNotifyMask | 
-            SubstructureRedirectMask);
+    native_raster::~native_raster() {
+
     }
 
-    native_app_wnd::~native_app_wnd() {}
+    int native_raster::width() const {
+        return width_;
+    }
 
-    void native_app_wnd::show() const { 
-        ::XMapWindow(display_, winst_);
+    int native_raster::height() const {
+        return height_;
+    }
+
+    uint8_t* native_raster::raw() const {
+        return raw_.get();
     }
     // Static variable.
     std::map<Window,native_wnd*> native_wnd::wmap_;
@@ -1167,6 +1310,9 @@ namespace nice {
         } // switch
         return quit;
     }
+
+#elif __SDL__
+
     app_id app::id() {
         return ::getpid();
     }
@@ -1196,80 +1342,33 @@ namespace nice {
 
     void app::run(const app_wnd& w) {
 
-        // We have to cast the constness away to 
-        // call non-const functions on window.
+        // Show the main window.
         auto& main_wnd=const_cast<app_wnd &>(w);
-
-        // Show the window.
         main_wnd.show();
 
-        // Flush it all.
-        ::XFlush(instance_.display);
+
+        /*
+        w = SDL_CreateWindow("zwin simulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_HIDDEN);
+        if (w == NULL)
+            printf("window could not be created: %s\n", SDL_GetError());
+        else
+        {
+            SDL_SetWindowSize(w, SCREEN_WIDTH, SCREEN_HEIGHT);
+            SDL_ShowWindow(w);
+        */
 
         // Main event loop.
-        XEvent e;
+        SDL_Event e;
+        /* Clean the queue */
         bool quit=false;
-	    while ( !quit ) // Will be interrupted by the OS.
-	    {
-	      ::XNextEvent ( instance_.display,&e );
-	      quit = native_wnd::global_wnd_proc(e);
-	    }
-    }
-    native_raster::native_raster(int width, int height, const uint8_t *rgba) :
-        native_raster(width,height) {
-        // Copy BGR array.
-        // TODO: Update.
-        uint8_t *dst=raw_.get();
-        for (int i=0; i<width*height; i++) {
-            int srci=3*i, dsti=4*i;
-
-            dst[dsti] = rgba[srci];
-            dst[dsti+1] = rgba[srci+1];
-            dst[dsti+2] = rgba[srci+2];
-            dst[dsti+3] = 0;
+        while (!quit) { 
+            // Wait for something to happen.
+            SDL_WaitEvent(&e);
+            /* User requested quit? */
+            if (e.type == SDL_QUIT)
+                quit = true;
         }
-    }
-    
-    native_raster::native_raster(int width, int height) :
-        width_(width), 
-        height_(height) {
 
-        // Calculate raster length.
-        len_ = width * height * 4; // ARGB!
-        // Allocate memory.
-        raw_=std::make_unique<uint8_t[]>(len_+1);
-    }  
-
-    native_raster::~native_raster() {
-
-    }
-
-    int native_raster::width() const {
-        return width_;
-    }
-
-    int native_raster::height() const {
-        return height_;
-    }
-
-    uint8_t* native_raster::raw() const {
-        return raw_.get();
-    }
-
-#elif __SDL__
-
-    void artist::draw_line(color c, pt p1, pt p2) const {
-        
-    }
-
-    void artist::draw_rect(color c, rct r) const {
-        
-    }
-
-    void artist::fill_rect(color c, rct r) const {   
-    }
-
-    void artist::draw_raster(const raster& rst, pt p) const {
     }
     native_app_wnd::native_app_wnd(
         app_wnd *window,
@@ -1292,6 +1391,19 @@ namespace nice {
 
     void native_app_wnd::show() const { 
         ::SDL_ShowWindow(winst_);
+    }
+    void artist::draw_line(color c, pt p1, pt p2) const {
+        
+    }
+
+    void artist::draw_rect(color c, rct r) const {
+        
+    }
+
+    void artist::fill_rect(color c, rct r) const {   
+    }
+
+    void artist::draw_raster(const raster& rst, pt p) const {
     }
     // Static variable.
     std::map<SDL_Window*,native_wnd*> native_wnd::wmap_;
@@ -1361,63 +1473,6 @@ namespace nice {
         bool quit=false;
         // TODO: process events and delegate to signals.
         return quit;
-    }
-    app_id app::id() {
-        return ::getpid();
-    }
-
-    bool app::is_primary_instance() {
-        // Are we already primary instance? If not, try to become one.
-        if (!primary_) {
-            std::string aname = app::name();
-
-            // Pid file needs to go to /var/run
-            std::ostringstream pfname, pid;
-            pfname << "/tmp/" << aname << ".pid";
-            pid << nice::app::id() << std::endl;
-
-            // Open, lock, and forget. Let the OS close and unlock.
-            int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
-            int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
-            primary_ = !(rc && EWOULDBLOCK == errno);
-            if (primary_) {
-                // Write our process id into the file.
-                ::write(pfd, pid.str().c_str(), pid.str().length());
-                return false;
-            }
-        }
-        return primary_;
-    }
-
-    void app::run(const app_wnd& w) {
-
-        // Show the main window.
-        auto& main_wnd=const_cast<app_wnd &>(w);
-        main_wnd.show();
-
-
-        /*
-        w = SDL_CreateWindow("zwin simulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_HIDDEN);
-        if (w == NULL)
-            printf("window could not be created: %s\n", SDL_GetError());
-        else
-        {
-            SDL_SetWindowSize(w, SCREEN_WIDTH, SCREEN_HEIGHT);
-            SDL_ShowWindow(w);
-        */
-
-        // Main event loop.
-        SDL_Event e;
-        /* Clean the queue */
-        bool quit=false;
-        while (!quit) { 
-            // Wait for something to happen.
-            SDL_WaitEvent(&e);
-            /* User requested quit? */
-            if (e.type == SDL_QUIT)
-                quit = true;
-        }
-
     }
 
 #endif

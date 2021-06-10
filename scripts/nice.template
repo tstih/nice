@@ -39,6 +39,7 @@ namespace nice {
 {{$INCLUDE DEC property.hpp}}
 {{$INCLUDE DEC geometry.hpp}}
 #ifdef __WIN__
+{{$INCLUDE DEC native/win/native_raster.hpp}}
 #elif __X11__
 {{$INCLUDE DEC native/x11/native_raster.hpp}}
 #elif __SDL__
