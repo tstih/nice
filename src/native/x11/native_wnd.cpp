@@ -74,7 +74,9 @@ namespace nice {
 
     // TODO: Implement.
     rct native_wnd::get_paint_area() {
-        return { 0,0,0,0 };
+        XWindowAttributes wattr;
+        ::XGetWindowAttributes(display_,winst_,&wattr);
+        return { 0, 0, wattr.width, wattr.height };
     }
 
     // Static (global) window proc. For all classes -

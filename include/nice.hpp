@@ -270,14 +270,15 @@ namespace nice {
         coord y2() { return top + height; }
     } rct;
 
-    class raster {
+#ifdef __WIN__
+#elif __X11__
+    class native_raster {
     public:
-        // Constructs a new raster.        
-        raster(int width, int height);
         // Construct a raster from resource.
-        raster(int width, int height, const uint8_t * bgrarr);
-        // Destructs the raster.
-        virtual ~raster();
+        native_raster(int width, int height, const uint8_t *rgba);
+        // Allocate resource.
+        native_raster(int width, int height);  
+        virtual ~native_raster();
         // Width.
         int width() const;
         // Height.
@@ -287,6 +288,31 @@ namespace nice {
     private:
         int width_, height_, len_;
         std::unique_ptr<uint8_t[]> raw_; // We own this!
+    };
+
+#elif __SDL__
+#endif
+    class raster {
+    public:
+        // Constructs a new raster.        
+        raster(int width, int height) {
+            native_=std::make_unique<native_raster>(width, height);
+        }
+        // Construct a raster from resource.
+        raster(int width, int height, const uint8_t * argb) {
+            native_=std::make_unique<native_raster>(width, height, argb);
+        }
+        // Destructs the raster.
+        virtual ~raster() {};
+        // Width.
+        int width() const { return native_->width(); }
+        // Height.
+        int height() const { return native_->height(); }
+        // Pointer to raw data.
+        uint8_t* raw() const { return native_->raw(); }
+    private:
+        // PIMPL.
+        std::unique_ptr<native_raster> native_;
     };
 
     struct resized_info {
@@ -629,36 +655,6 @@ namespace nice {
     void app_wnd::show() {
         native()->show();
     }
-    
-    raster::raster(int width, int height) : 
-        width_(width), 
-        height_(height) {
-        
-        // Calculate raster length.
-        len_ = width * height * 3;
-        // Allocate memory.
-        raw_=std::make_unique<uint8_t[]>(len_+1);
-    }
-
-    raster::raster(int width, int height, const uint8_t* bgrarr) :
-        raster(width,height) {
-        // Copy BGR array.
-        std::copy(bgrarr, bgrarr + len_, raw_.get());
-    }
-
-    raster::~raster() {}
-
-    int raster::width() const {
-        return width_;
-    }
-
-    int raster::height() const {
-        return height_;
-    }
-
-    uint8_t* raster::raw() const {
-        return raw_.get();
-    }
 
 
 #ifdef __WIN__
@@ -942,24 +938,47 @@ namespace nice {
     }
 
     void artist::fill_rect(color c, rct r) const {   
-
-        auto screen=DefaultScreen(canvas_.d);
-
-        Colormap cmap=DefaultColormap(canvas_.d,screen);    
-        XColor xcolour;
-
-        // I guess XParseColor will work here
-        xcolour.red = 32000; xcolour.green = 65000; xcolour.blue = 32000;
-        xcolour.flags = DoRed | DoGreen | DoBlue;
-        XAllocColor(canvas_.d, cmap, &xcolour);
-
-        XSetForeground(canvas_.d, canvas_.gc, xcolour.pixel);
-
-        // TODO:
-        XFillRectangle( canvas_.d, canvas_.w, canvas_.gc, r.x, r.y, 200, 200 );
+        // 1000 mile walk to create a simple RGB color.
+        Colormap cmap=DefaultColormap(canvas_.d,DefaultScreen(canvas_.d));    
+        XColor xc;
+        xc.red=c.r * 0xff; 
+        xc.green=c.g * 0xff; 
+        xc.blue=c.b * 0xff;
+        xc.flags = DoRed | DoGreen | DoBlue;
+        XAllocColor(canvas_.d, cmap, &xc);
+        // Set pen.
+        XSetForeground(canvas_.d, canvas_.gc, xc.pixel);
+        // And fill rect.
+        XFillRectangle( canvas_.d, canvas_.w, canvas_.gc, r.x, r.y, r.w, r.h );
     }
 
     void artist::draw_raster(const raster& rst, pt p) const {
+        // Get the visual.
+        Visual *visual=DefaultVisual(canvas_.d, DefaultScreen(canvas_.d));
+        // Create the iage.
+        XImage* img=XCreateImage(
+            canvas_.d, 
+            visual, 
+            24, 
+            ZPixmap, 
+            0, 
+            (char*)rst.raw(),
+            rst.width(),
+            rst.height(),
+            32,
+            0);
+        // Draw it!
+        XPutImage(
+            canvas_.d, 
+            canvas_.w, 
+            canvas_.gc, 
+            img, 
+            0, 0, 0, 0, 
+            rst.width(), rst.height());
+        // We don't want our raster object wildly released by XDestroyImage.
+        img->data=NULL;
+        // Destroy the image.
+        XDestroyImage(img);
     }
     native_app_wnd::native_app_wnd(
         app_wnd *window,
@@ -1062,7 +1081,9 @@ namespace nice {
 
     // TODO: Implement.
     rct native_wnd::get_paint_area() {
-        return { 0,0,0,0 };
+        XWindowAttributes wattr;
+        ::XGetWindowAttributes(display_,winst_,&wattr);
+        return { 0, 0, wattr.width, wattr.height };
     }
 
     // Static (global) window proc. For all classes -
@@ -1193,6 +1214,46 @@ namespace nice {
 	      ::XNextEvent ( instance_.display,&e );
 	      quit = native_wnd::global_wnd_proc(e);
 	    }
+    }
+    native_raster::native_raster(int width, int height, const uint8_t *rgba) :
+        native_raster(width,height) {
+        // Copy BGR array.
+        // TODO: Update.
+        uint8_t *dst=raw_.get();
+        for (int i=0; i<width*height; i++) {
+            int srci=3*i, dsti=4*i;
+
+            dst[dsti] = rgba[srci];
+            dst[dsti+1] = rgba[srci+1];
+            dst[dsti+2] = rgba[srci+2];
+            dst[dsti+3] = 0;
+        }
+    }
+    
+    native_raster::native_raster(int width, int height) :
+        width_(width), 
+        height_(height) {
+
+        // Calculate raster length.
+        len_ = width * height * 4; // ARGB!
+        // Allocate memory.
+        raw_=std::make_unique<uint8_t[]>(len_+1);
+    }  
+
+    native_raster::~native_raster() {
+
+    }
+
+    int native_raster::width() const {
+        return width_;
+    }
+
+    int native_raster::height() const {
+        return height_;
+    }
+
+    uint8_t* native_raster::raw() const {
+        return raw_.get();
     }
 
 #elif __SDL__

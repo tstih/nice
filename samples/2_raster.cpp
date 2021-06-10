@@ -8,7 +8,7 @@ extern uint8_t tut_raster[];
 
 class main_wnd : public app_wnd {
 public:
-    main_wnd() : app_wnd("Raster", { 320,200 })
+    main_wnd() : app_wnd("Raster", { 1023,512 })
     {
         paint.connect(this, &main_wnd::on_paint);
     }
@@ -16,7 +16,7 @@ private:
     raster tut_{256,192,tut_raster};
 
     bool on_paint(const artist& a) {
-        a.fill_rect({ 0,0,255 }, paint_area);
+        a.fill_rect({ 0,0,0xff }, paint_area);
         a.draw_raster(tut_, { 0,0 });
         return true;
     }

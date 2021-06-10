@@ -22,24 +22,47 @@ namespace nice {
     }
 
     void artist::fill_rect(color c, rct r) const {   
-
-        auto screen=DefaultScreen(canvas_.d);
-
-        Colormap cmap=DefaultColormap(canvas_.d,screen);    
-        XColor xcolour;
-
-        // I guess XParseColor will work here
-        xcolour.red = 32000; xcolour.green = 65000; xcolour.blue = 32000;
-        xcolour.flags = DoRed | DoGreen | DoBlue;
-        XAllocColor(canvas_.d, cmap, &xcolour);
-
-        XSetForeground(canvas_.d, canvas_.gc, xcolour.pixel);
-
-        // TODO:
-        XFillRectangle( canvas_.d, canvas_.w, canvas_.gc, r.x, r.y, 200, 200 );
+        // 1000 mile walk to create a simple RGB color.
+        Colormap cmap=DefaultColormap(canvas_.d,DefaultScreen(canvas_.d));    
+        XColor xc;
+        xc.red=c.r * 0xff; 
+        xc.green=c.g * 0xff; 
+        xc.blue=c.b * 0xff;
+        xc.flags = DoRed | DoGreen | DoBlue;
+        XAllocColor(canvas_.d, cmap, &xc);
+        // Set pen.
+        XSetForeground(canvas_.d, canvas_.gc, xc.pixel);
+        // And fill rect.
+        XFillRectangle( canvas_.d, canvas_.w, canvas_.gc, r.x, r.y, r.w, r.h );
     }
 
     void artist::draw_raster(const raster& rst, pt p) const {
+        // Get the visual.
+        Visual *visual=DefaultVisual(canvas_.d, DefaultScreen(canvas_.d));
+        // Create the iage.
+        XImage* img=XCreateImage(
+            canvas_.d, 
+            visual, 
+            24, 
+            ZPixmap, 
+            0, 
+            (char*)rst.raw(),
+            rst.width(),
+            rst.height(),
+            32,
+            0);
+        // Draw it!
+        XPutImage(
+            canvas_.d, 
+            canvas_.w, 
+            canvas_.gc, 
+            img, 
+            0, 0, 0, 0, 
+            rst.width(), rst.height());
+        // We don't want our raster object wildly released by XDestroyImage.
+        img->data=NULL;
+        // Destroy the image.
+        XDestroyImage(img);
     }
 //{{END.DEF}}
 }

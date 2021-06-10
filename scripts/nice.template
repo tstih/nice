@@ -38,6 +38,11 @@ namespace nice {
 {{$INCLUDE DEC resource.hpp}}
 {{$INCLUDE DEC property.hpp}}
 {{$INCLUDE DEC geometry.hpp}}
+#ifdef __WIN__
+#elif __X11__
+{{$INCLUDE DEC native/x11/native_raster.hpp}}
+#elif __SDL__
+#endif
 {{$INCLUDE DEC raster.hpp}}
 {{$INCLUDE DEC resized_info.hpp}}
 {{$INCLUDE DEC mouse_info.hpp}}

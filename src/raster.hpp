@@ -4,6 +4,10 @@
 // Raster image (32bpp raw data). This is used for all 
 // images in nice.
 //
+// TODO:
+//  Only one constructor with default parameter
+//  Switch to actual argb
+//
 // (c) 2021 Tomaz Stih
 // This code is licensed under MIT license (see LICENSE.txt for details).
 // 
@@ -20,20 +24,24 @@ namespace nice {
     class raster {
     public:
         // Constructs a new raster.        
-        raster(int width, int height);
+        raster(int width, int height) {
+            native_=std::make_unique<native_raster>(width, height);
+        }
         // Construct a raster from resource.
-        raster(int width, int height, const uint8_t * bgrarr);
+        raster(int width, int height, const uint8_t * argb) {
+            native_=std::make_unique<native_raster>(width, height, argb);
+        }
         // Destructs the raster.
-        virtual ~raster();
+        virtual ~raster() {};
         // Width.
-        int width() const;
+        int width() const { return native_->width(); }
         // Height.
-        int height() const;
+        int height() const { return native_->height(); }
         // Pointer to raw data.
-        uint8_t* raw() const;
+        uint8_t* raw() const { return native_->raw(); }
     private:
-        int width_, height_, len_;
-        std::unique_ptr<uint8_t[]> raw_; // We own this!
+        // PIMPL.
+        std::unique_ptr<native_raster> native_;
     };
 //{{END.DEC}}
 } // namespace nice
