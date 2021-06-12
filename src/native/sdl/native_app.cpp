@@ -47,17 +47,6 @@ namespace nice {
         auto& main_wnd=const_cast<app_wnd &>(w);
         main_wnd.show();
 
-
-        /*
-        w = SDL_CreateWindow("zwin simulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_HIDDEN);
-        if (w == NULL)
-            printf("window could not be created: %s\n", SDL_GetError());
-        else
-        {
-            SDL_SetWindowSize(w, SCREEN_WIDTH, SCREEN_HEIGHT);
-            SDL_ShowWindow(w);
-        */
-
         // Main event loop.
         SDL_Event e;
         /* Clean the queue */
@@ -65,11 +54,8 @@ namespace nice {
         while (!quit) { 
             // Wait for something to happen.
             SDL_WaitEvent(&e);
-            /* User requested quit? */
-            if (e.type == SDL_QUIT)
-                quit = true;
+            quit = native_wnd::global_wnd_proc(e);
         }
-
     }
 //{{END.DEF}}
 

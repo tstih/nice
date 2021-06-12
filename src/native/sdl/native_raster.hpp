@@ -1,7 +1,7 @@
 //
 // native_raster.hpp
 // 
-// Native raster (x11) header.
+// Native raster (sdl) header.
 // 
 // (c) 2021 Tomaz Stih
 // This code is licensed under MIT license (see LICENSE.txt for details).

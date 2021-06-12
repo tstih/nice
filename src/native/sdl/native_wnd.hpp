@@ -49,6 +49,8 @@ namespace nice {
     protected:
         // Native SDL window structure.
         SDL_Window* winst_; 
+        // Window surface.
+        SDL_Renderer *wrenderer_;
         // A map from X11 window to native_wnd.
         static std::map<SDL_Window *,native_wnd*> wmap_;
         // Local window procdure.

@@ -28,9 +28,14 @@ namespace nice {
 
         // Store window to window list.
         wmap_.insert(std::pair<SDL_Window*,native_wnd*>(winst_, this));
+
+        // Get window surface.
+        wrenderer_=::SDL_CreateRenderer( winst_, -1, SDL_RENDERER_ACCELERATED);
     }
 
-    native_app_wnd::~native_app_wnd() {}
+    native_app_wnd::~native_app_wnd() {
+        ::SDL_DestroyRenderer(wrenderer_);
+    }
 
     void native_app_wnd::show() const { 
         ::SDL_ShowWindow(winst_);

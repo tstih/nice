@@ -5,7 +5,7 @@
         "type": "shell",
         "label": "build",
         "command": "make",
-        "args": [],
+        "args": ["sdl"],
         "problemMatcher": ["$gcc"],
         "group": {
           "kind": "build",

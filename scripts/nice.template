@@ -43,6 +43,7 @@ namespace nice {
 #elif __X11__
 {{$INCLUDE DEC native/x11/native_raster.hpp}}
 #elif __SDL__
+{{$INCLUDE DEC native/x11/native_raster.hpp}}
 #endif
 {{$INCLUDE DEC raster.hpp}}
 {{$INCLUDE DEC resized_info.hpp}}

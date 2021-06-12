@@ -29,7 +29,7 @@ namespace nice {
     typedef uint8_t byte;
 
     // X11 GC and required stuff.
-    typedef SDL_Surface* canvas;
+    typedef SDL_Renderer* canvas;
 //{{END.TYP}}
 
 }

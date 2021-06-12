@@ -108,7 +108,7 @@ namespace nice {
     typedef uint8_t byte;
 
     // X11 GC and required stuff.
-    typedef SDL_Surface* canvas;
+    typedef SDL_Renderer* canvas;
 
 #endif
 
@@ -293,7 +293,7 @@ namespace nice {
     class native_raster {
     public:
         // Construct a raster from resource.
-        native_raster(int width, int height, const uint8_t *rgba);
+        native_raster(int width, int height, const uint8_t *bgra);
         // Allocate resource.
         native_raster(int width, int height);  
         virtual ~native_raster();
@@ -309,6 +309,24 @@ namespace nice {
     };
 
 #elif __SDL__
+    class native_raster {
+    public:
+        // Construct a raster from resource.
+        native_raster(int width, int height, const uint8_t *bgra);
+        // Allocate resource.
+        native_raster(int width, int height);  
+        virtual ~native_raster();
+        // Width.
+        int width() const;
+        // Height.
+        int height() const;
+        // Pointer to raw data.
+        uint8_t* raw() const;
+    private:
+        int width_, height_, len_;
+        std::unique_ptr<uint8_t[]> raw_; // We own this!
+    };
+
 #endif
     class raster {
     public:
@@ -495,6 +513,8 @@ namespace nice {
     protected:
         // Native SDL window structure.
         SDL_Window* winst_; 
+        // Window surface.
+        SDL_Renderer *wrenderer_;
         // A map from X11 window to native_wnd.
         static std::map<SDL_Window *,native_wnd*> wmap_;
         // Local window procdure.
@@ -642,6 +662,21 @@ namespace nice {
     std::string app::name() {
         return std::filesystem::path(args[0]).stem().string();
     }
+    void wnd::repaint(void) { native()->repaint(); }
+    
+    std::string wnd::get_title() { return native()->get_title(); }
+    
+    void wnd::set_title(std::string s) { native()->set_title(s); } 
+    
+    size wnd::get_wsize() { return native()->get_wsize(); }
+    
+    void wnd::set_wsize(size sz) { native()->set_wsize(sz); } 
+    
+    pt wnd::get_location() { return native()->get_location(); }
+    
+    void wnd::set_location(pt location) { native()->set_location(location); } 
+
+    rct wnd::get_paint_area() { return native()->get_paint_area(); };
     bool app_wnd::on_destroy() {
         // Destroy native window.
         native()->destroy();
@@ -658,103 +693,10 @@ namespace nice {
     void app_wnd::show() {
         native()->show();
     }
-    void wnd::repaint(void) { native()->repaint(); }
-    
-    std::string wnd::get_title() { return native()->get_title(); }
-    
-    void wnd::set_title(std::string s) { native()->set_title(s); } 
-    
-    size wnd::get_wsize() { return native()->get_wsize(); }
-    
-    void wnd::set_wsize(size sz) { native()->set_wsize(sz); } 
-    
-    pt wnd::get_location() { return native()->get_location(); }
-    
-    void wnd::set_location(pt location) { native()->set_location(location); } 
-
-    rct wnd::get_paint_area() { return native()->get_paint_area(); };
 
 
 #ifdef __WIN__
 
-    app_id app::id() {
-        return ::GetCurrentProcessId();
-    }
-
-    bool app::is_primary_instance() {
-        // Are we already primary instance? If not, try to become one.
-        if (!primary_) {
-            std::string aname = app::name();
-            // Create local mutex.
-            std::ostringstream name;
-            name << "Local\\" << aname;
-            ::CreateMutex(0, FALSE, name.str().c_str());
-            // We are primary instance.
-            primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
-        }
-        return primary_;
-    }
-
-    void app::run(const app_wnd& w) {
-
-        // We have to cast the constness away to 
-        // call non-const functions on window.
-        auto& main_wnd=const_cast<app_wnd &>(w);
-        main_wnd.show();
-
-        // Message loop.
-        MSG msg;
-        while (::GetMessage(&msg, NULL, 0, 0))
-        {
-            ::TranslateMessage(&msg);
-            ::DispatchMessage(&msg);
-        }
-
-        // Finally, set the return code.
-        ret_code = (int)msg.wParam;
-    }
-    native_app_wnd::native_app_wnd(
-        app_wnd *window,
-        std::string title,
-        size size
-    ) : native_wnd(window) {
-
-        // Create app window.
-        class_ = app::name();
-
-        // Register window.
-        ::ZeroMemory(&wcex_, sizeof(WNDCLASSEX));
-        wcex_.cbSize = sizeof(WNDCLASSEX);
-        wcex_.lpfnWndProc = global_wnd_proc;
-        wcex_.hInstance = app::instance();
-        wcex_.lpszClassName = class_.c_str();
-        wcex_.hCursor = ::LoadCursor(NULL, IDC_ARROW);
-
-        if (!::RegisterClassEx(&wcex_)) 
-            throw_ex(nice_exception,"Unable to register class.");
-
-        // Create it.
-        hwnd_ = ::CreateWindowEx(
-            0,
-            class_.c_str(),
-            title.c_str(),
-            WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT, CW_USEDEFAULT,
-            size.width, size.height,
-            NULL,
-            NULL,
-            app::instance(),
-            this);
-
-        if (!hwnd_)
-            throw_ex(nice_exception,"Unable to create window.");
-    }
-
-    native_app_wnd::~native_app_wnd() {}
-
-    void native_app_wnd::show() const { 
-        ::ShowWindow(hwnd_, SW_SHOWNORMAL); 
-    }
     void artist::draw_line(color c, pt p1, pt p2) const {
         HPEN pen = ::CreatePen(PS_SOLID, 1, RGB(c.r, c.g, c.b));
         ::SelectObject(canvas_, pen);
@@ -799,42 +741,47 @@ namespace nice {
             DIB_RGB_COLORS
         );
     }
-    native_raster::native_raster(int width, int height, const uint8_t *bgra) :
-        native_raster(width,height) {
-        // For windows we need 24 bit BGR array.
-        uint8_t *dst=raw_.get();
-        for (int i=0; i<width*height; i++) {
-            int srci=4*i, dsti=3*i;
-            dst[dsti] = bgra[srci];
-            dst[dsti+1] = bgra[srci+1];
-            dst[dsti+2] = bgra[srci+2];
-        }
+    native_app_wnd::native_app_wnd(
+        app_wnd *window,
+        std::string title,
+        size size
+    ) : native_wnd(window) {
+
+        // Create app window.
+        class_ = app::name();
+
+        // Register window.
+        ::ZeroMemory(&wcex_, sizeof(WNDCLASSEX));
+        wcex_.cbSize = sizeof(WNDCLASSEX);
+        wcex_.lpfnWndProc = global_wnd_proc;
+        wcex_.hInstance = app::instance();
+        wcex_.lpszClassName = class_.c_str();
+        wcex_.hCursor = ::LoadCursor(NULL, IDC_ARROW);
+
+        if (!::RegisterClassEx(&wcex_)) 
+            throw_ex(nice_exception,"Unable to register class.");
+
+        // Create it.
+        hwnd_ = ::CreateWindowEx(
+            0,
+            class_.c_str(),
+            title.c_str(),
+            WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT, CW_USEDEFAULT,
+            size.width, size.height,
+            NULL,
+            NULL,
+            app::instance(),
+            this);
+
+        if (!hwnd_)
+            throw_ex(nice_exception,"Unable to create window.");
     }
-    
-    native_raster::native_raster(int width, int height) :
-        width_(width), 
-        height_(height) {
 
-        // Calculate raster length.
-        len_ = width * height * 3; // BGRA!
-        // Allocate memory.
-        raw_=std::make_unique<uint8_t[]>(len_);
-    }  
+    native_app_wnd::~native_app_wnd() {}
 
-    native_raster::~native_raster() {
-
-    }
-
-    int native_raster::width() const {
-        return width_;
-    }
-
-    int native_raster::height() const {
-        return height_;
-    }
-
-    uint8_t* native_raster::raw() const {
-        return raw_.get();
+    void native_app_wnd::show() const { 
+        ::ShowWindow(hwnd_, SW_SHOWNORMAL); 
     }
     void native_wnd::destroy(void) {
         ::PostQuitMessage(0);
@@ -983,32 +930,20 @@ namespace nice {
             return 0;
 
     }
-
-#elif __X11__
-
     app_id app::id() {
-        return ::getpid();
+        return ::GetCurrentProcessId();
     }
 
     bool app::is_primary_instance() {
         // Are we already primary instance? If not, try to become one.
         if (!primary_) {
             std::string aname = app::name();
-
-            // Pid file needs to go to /var/run
-            std::ostringstream pfname, pid;
-            pfname << "/tmp/" << aname << ".pid";
-            pid << nice::app::id() << std::endl;
-
-            // Open, lock, and forget. Let the OS close and unlock.
-            int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
-            int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
-            primary_ = !(rc && EWOULDBLOCK == errno);
-            if (primary_) {
-                // Write our process id into the file.
-                ::write(pfd, pid.str().c_str(), pid.str().length());
-                return false;
-            }
+            // Create local mutex.
+            std::ostringstream name;
+            name << "Local\\" << aname;
+            ::CreateMutex(0, FALSE, name.str().c_str());
+            // We are primary instance.
+            primary_ = !(::GetLastError() == ERROR_ALREADY_EXISTS);
         }
         return primary_;
     }
@@ -1018,62 +953,59 @@ namespace nice {
         // We have to cast the constness away to 
         // call non-const functions on window.
         auto& main_wnd=const_cast<app_wnd &>(w);
-
-        // Show the window.
         main_wnd.show();
 
-        // Flush it all.
-        ::XFlush(instance_.display);
+        // Message loop.
+        MSG msg;
+        while (::GetMessage(&msg, NULL, 0, 0))
+        {
+            ::TranslateMessage(&msg);
+            ::DispatchMessage(&msg);
+        }
 
-        // Main event loop.
-        XEvent e;
-        bool quit=false;
-	    while ( !quit ) // Will be interrupted by the OS.
-	    {
-	      ::XNextEvent ( instance_.display,&e );
-	      quit = native_wnd::global_wnd_proc(e);
-	    }
+        // Finally, set the return code.
+        ret_code = (int)msg.wParam;
     }
-    native_app_wnd::native_app_wnd(
-        app_wnd *window,
-        std::string title,
-        size size
-    ) : native_wnd(window) {
+    native_raster::native_raster(int width, int height, const uint8_t *bgra) :
+        native_raster(width,height) {
+        // For windows we need 24 bit BGR array.
+        uint8_t *dst=raw_.get();
+        for (int i=0; i<width*height; i++) {
+            int srci=4*i, dsti=3*i;
+            dst[dsti] = bgra[srci];
+            dst[dsti+1] = bgra[srci+1];
+            dst[dsti+2] = bgra[srci+2];
+        }
+    }
+    
+    native_raster::native_raster(int width, int height) :
+        width_(width), 
+        height_(height) {
 
-        int s = DefaultScreen(display_);
-        winst_ = ::XCreateSimpleWindow(
-            display_, 
-            RootWindow(display_, s), 
-            10, // x 
-            10, // y
-            size.width, 
-            size.height, 
-            1, // border width
-            BlackPixel(display_, s), // border color
-            WhitePixel(display_, s)  // background color
-        );
-        // Store window to window list.
-        wmap_.insert(std::pair<Window,native_wnd*>(winst_, this));
-        // Set initial title.
-        ::XSetStandardProperties(display_,winst_,title.c_str(),NULL,None,NULL,0,NULL);
+        // Calculate raster length.
+        len_ = width * height * 3; // BGRA!
+        // Allocate memory.
+        raw_=std::make_unique<uint8_t[]>(len_);
+    }  
 
-        // Rather strange handling of close window by X11.
-        Atom atom = XInternAtom ( display_,"WM_DELETE_WINDOW", false );
-        ::XSetWMProtocols(display_, winst_, &atom, 1);
+    native_raster::~native_raster() {
 
-        // TODO: Implement lazy subscription (somday)
-        ::XSelectInput (display_, winst_,
-			ExposureMask | ButtonPressMask | ButtonReleaseMask | EnterWindowMask | 
-            LeaveWindowMask | PointerMotionMask | FocusChangeMask | KeyPressMask |
-            KeyReleaseMask | SubstructureNotifyMask | StructureNotifyMask | 
-            SubstructureRedirectMask);
     }
 
-    native_app_wnd::~native_app_wnd() {}
-
-    void native_app_wnd::show() const { 
-        ::XMapWindow(display_, winst_);
+    int native_raster::width() const {
+        return width_;
     }
+
+    int native_raster::height() const {
+        return height_;
+    }
+
+    uint8_t* native_raster::raw() const {
+        return raw_.get();
+    }
+
+#elif __X11__
+
     void artist::draw_line(color c, pt p1, pt p2) const {
     }
 
@@ -1123,45 +1055,45 @@ namespace nice {
         // Destroy the image.
         XDestroyImage(img);
     }
-    native_raster::native_raster(int width, int height, const uint8_t *rgba) :
-        native_raster(width,height) {
-        // Copy BGR array.
-        // TODO: Update.
-        uint8_t *dst=raw_.get();
-        for (int i=0; i<width*height; i++) {
-            int srci=3*i, dsti=4*i;
+    native_app_wnd::native_app_wnd(
+        app_wnd *window,
+        std::string title,
+        size size
+    ) : native_wnd(window) {
 
-            dst[dsti] = rgba[srci];
-            dst[dsti+1] = rgba[srci+1];
-            dst[dsti+2] = rgba[srci+2];
-            dst[dsti+3] = 0;
-        }
-    }
-    
-    native_raster::native_raster(int width, int height) :
-        width_(width), 
-        height_(height) {
+        int s = DefaultScreen(display_);
+        winst_ = ::XCreateSimpleWindow(
+            display_, 
+            RootWindow(display_, s), 
+            10, // x 
+            10, // y
+            size.width, 
+            size.height, 
+            1, // border width
+            BlackPixel(display_, s), // border color
+            WhitePixel(display_, s)  // background color
+        );
+        // Store window to window list.
+        wmap_.insert(std::pair<Window,native_wnd*>(winst_, this));
+        // Set initial title.
+        ::XSetStandardProperties(display_,winst_,title.c_str(),NULL,None,NULL,0,NULL);
 
-        // Calculate raster length.
-        len_ = width * height * 4; // ARGB!
-        // Allocate memory.
-        raw_=std::make_unique<uint8_t[]>(len_+1);
-    }  
+        // Rather strange handling of close window by X11.
+        Atom atom = XInternAtom ( display_,"WM_DELETE_WINDOW", false );
+        ::XSetWMProtocols(display_, winst_, &atom, 1);
 
-    native_raster::~native_raster() {
-
-    }
-
-    int native_raster::width() const {
-        return width_;
-    }
-
-    int native_raster::height() const {
-        return height_;
+        // TODO: Implement lazy subscription (somday)
+        ::XSelectInput (display_, winst_,
+			ExposureMask | ButtonPressMask | ButtonReleaseMask | EnterWindowMask | 
+            LeaveWindowMask | PointerMotionMask | FocusChangeMask | KeyPressMask |
+            KeyReleaseMask | SubstructureNotifyMask | StructureNotifyMask | 
+            SubstructureRedirectMask);
     }
 
-    uint8_t* native_raster::raw() const {
-        return raw_.get();
+    native_app_wnd::~native_app_wnd() {}
+
+    void native_app_wnd::show() const { 
+        ::XMapWindow(display_, winst_);
     }
     // Static variable.
     std::map<Window,native_wnd*> native_wnd::wmap_;
@@ -1310,9 +1242,6 @@ namespace nice {
         } // switch
         return quit;
     }
-
-#elif __SDL__
-
     app_id app::id() {
         return ::getpid();
     }
@@ -1342,33 +1271,104 @@ namespace nice {
 
     void app::run(const app_wnd& w) {
 
-        // Show the main window.
+        // We have to cast the constness away to 
+        // call non-const functions on window.
         auto& main_wnd=const_cast<app_wnd &>(w);
+
+        // Show the window.
         main_wnd.show();
 
-
-        /*
-        w = SDL_CreateWindow("zwin simulator", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_HIDDEN);
-        if (w == NULL)
-            printf("window could not be created: %s\n", SDL_GetError());
-        else
-        {
-            SDL_SetWindowSize(w, SCREEN_WIDTH, SCREEN_HEIGHT);
-            SDL_ShowWindow(w);
-        */
+        // Flush it all.
+        ::XFlush(instance_.display);
 
         // Main event loop.
-        SDL_Event e;
-        /* Clean the queue */
+        XEvent e;
         bool quit=false;
-        while (!quit) { 
-            // Wait for something to happen.
-            SDL_WaitEvent(&e);
-            /* User requested quit? */
-            if (e.type == SDL_QUIT)
-                quit = true;
-        }
+	    while ( !quit ) // Will be interrupted by the OS.
+	    {
+	      ::XNextEvent ( instance_.display,&e );
+	      quit = native_wnd::global_wnd_proc(e);
+	    }
+    }
+    native_raster::native_raster(int width, int height, const uint8_t *bgra) :
+        native_raster(width,height) {
+        // Copy complete BGRA array.
+        std::copy(bgra, bgra+len_, raw_.get());
+    }
+    
+    native_raster::native_raster(int width, int height) :
+        width_(width), 
+        height_(height) {
 
+        // Calculate raster length.
+        len_ = width * height * 4; // BGRA!
+        // Allocate memory.
+        raw_=std::make_unique<uint8_t[]>(len_);
+    }  
+
+    native_raster::~native_raster() {
+
+    }
+
+    int native_raster::width() const {
+        return width_;
+    }
+
+    int native_raster::height() const {
+        return height_;
+    }
+
+    uint8_t* native_raster::raw() const {
+        return raw_.get();
+    }
+
+#elif __SDL__
+
+    void artist::draw_line(color c, pt p1, pt p2) const {
+        ::SDL_SetRenderDrawColor(canvas_, c.r, c.g, c.b, c.a);
+        ::SDL_RenderDrawLine(canvas_,p1.x, p1.y, p2.x, p2.y);
+    }
+
+    void artist::draw_rect(color c, rct r) const {
+        SDL_Rect rdst={ r.x, r.y, r.w, r.h};
+        ::SDL_SetRenderDrawColor(canvas_, c.r, c.g, c.b, c.a);
+        ::SDL_RenderDrawRect(canvas_,&rdst);
+    }
+
+    void artist::fill_rect(color c, rct r) const {
+        SDL_Rect rdst={ r.x, r.y, r.w, r.h};
+        ::SDL_SetRenderDrawColor(canvas_, c.r, c.g, c.b, c.a);
+        ::SDL_RenderFillRect(canvas_,&rdst);
+    }
+
+    void artist::draw_raster(const raster& rst, pt p) const {
+        
+        // Create a surface.
+        SDL_Surface *surface=SDL_CreateRGBSurfaceFrom(
+            rst.raw(),
+            rst.width(),
+            rst.height(),
+            32,
+            4*rst.width(),
+            0,0,0,0
+        );
+
+        // Get surface to texture.
+        SDL_Texture *texture = SDL_CreateTextureFromSurface(canvas_, surface);
+
+        // Draw on window.
+        SDL_Rect rsrc={ 0, 0, rst.width(), rst.height() };
+        SDL_Rect rdst={ p.x, p.y, rst.width(), rst.height()};
+        SDL_RenderCopy( 
+            canvas_, 
+            texture, 
+            &rsrc, 
+            &rdst
+        );
+
+        // And free surface and texture.
+        SDL_DestroyTexture(texture);
+        SDL_FreeSurface(surface);
     }
     native_app_wnd::native_app_wnd(
         app_wnd *window,
@@ -1385,25 +1385,17 @@ namespace nice {
 
         // Store window to window list.
         wmap_.insert(std::pair<SDL_Window*,native_wnd*>(winst_, this));
+
+        // Get window surface.
+        wrenderer_=::SDL_CreateRenderer( winst_, -1, SDL_RENDERER_ACCELERATED);
     }
 
-    native_app_wnd::~native_app_wnd() {}
+    native_app_wnd::~native_app_wnd() {
+        ::SDL_DestroyRenderer(wrenderer_);
+    }
 
     void native_app_wnd::show() const { 
         ::SDL_ShowWindow(winst_);
-    }
-    void artist::draw_line(color c, pt p1, pt p2) const {
-        
-    }
-
-    void artist::draw_rect(color c, rct r) const {
-        
-    }
-
-    void artist::fill_rect(color c, rct r) const {   
-    }
-
-    void artist::draw_raster(const raster& rst, pt p) const {
     }
     // Static variable.
     std::map<SDL_Window*,native_wnd*> native_wnd::wmap_;
@@ -1457,13 +1449,16 @@ namespace nice {
 
     // TODO: Implement.
     rct native_wnd::get_paint_area() {
-        return { 0,0,0,0 };
+        int w,h;
+        ::SDL_GetWindowSize(winst_, &w, &h);
+        return { 0,0,w,h };
     }
 
     // TODO:for now SDL only has one window so we're
     // assuming the first entry in the map, but we're
     // ready for more!
     bool native_wnd::global_wnd_proc(const SDL_Event& e) {
+        if (wmap_.size()==0) return false;
         native_wnd* nw = wmap_.begin()->second;
         return nw->local_wnd_proc(e);
     }
@@ -1471,8 +1466,121 @@ namespace nice {
     // Local (per window) window proc.
     bool native_wnd::local_wnd_proc(const SDL_Event& e) {
         bool quit=false;
-        // TODO: process events and delegate to signals.
+        switch(e.type) {
+            case SDL_WINDOWEVENT:
+                switch (e.window.event) {
+                    case SDL_WINDOWEVENT_EXPOSED:
+                    {
+                        // Paint event.
+                        artist a(wrenderer_);
+                        window_->paint.emit(a);
+                        ::SDL_RenderPresent( wrenderer_ );
+                    }
+                    break;
+                    case SDL_WINDOWEVENT_SIZE_CHANGED:
+                    {
+                        // Resize event.
+                        int width = e.window.data1;
+                        int height = e.window.data2;
+                        window_->resized.emit({width, height});
+                    }
+                    break;
+                    case SDL_WINDOWEVENT_CLOSE:
+                        // Destroy, I guess...
+                        quit=true;
+                        break;
+                }
+            break;
+            case SDL_MOUSEBUTTONDOWN:
+            break;
+            case SDL_MOUSEBUTTONUP:
+            break;
+            case SDL_MOUSEMOTION:
+            {
+                mouse_info mi = {
+                    {e.motion.x, e.motion.y}, // point
+                    (bool)(e.motion.state & SDL_BUTTON_LMASK),
+                    (bool)(e.motion.state & SDL_BUTTON_MMASK),
+                    (bool)(e.motion.state & SDL_BUTTON_RMASK),
+                    false, // TODO: Shift and Ctrl status.
+                    false
+                };
+            }
+            break;
+        }
         return quit;
+    }
+    app_id app::id() {
+        return ::getpid();
+    }
+
+    bool app::is_primary_instance() {
+        // Are we already primary instance? If not, try to become one.
+        if (!primary_) {
+            std::string aname = app::name();
+
+            // Pid file needs to go to /var/run
+            std::ostringstream pfname, pid;
+            pfname << "/tmp/" << aname << ".pid";
+            pid << nice::app::id() << std::endl;
+
+            // Open, lock, and forget. Let the OS close and unlock.
+            int pfd = ::open(pfname.str().c_str(), O_CREAT | O_RDWR, 0666);
+            int rc = ::flock(pfd, LOCK_EX | LOCK_NB);
+            primary_ = !(rc && EWOULDBLOCK == errno);
+            if (primary_) {
+                // Write our process id into the file.
+                ::write(pfd, pid.str().c_str(), pid.str().length());
+                return false;
+            }
+        }
+        return primary_;
+    }
+
+    void app::run(const app_wnd& w) {
+
+        // Show the main window.
+        auto& main_wnd=const_cast<app_wnd &>(w);
+        main_wnd.show();
+
+        // Main event loop.
+        SDL_Event e;
+        /* Clean the queue */
+        bool quit=false;
+        while (!quit) { 
+            // Wait for something to happen.
+            SDL_WaitEvent(&e);
+            quit = native_wnd::global_wnd_proc(e);
+        }
+    }
+    native_raster::native_raster(int width, int height, const uint8_t *bgra) :
+        native_raster(width,height) {
+        // Copy complete BGRA array.
+        std::copy(bgra, bgra+len_, raw_.get());
+    }
+    
+    native_raster::native_raster(int width, int height) :
+        width_(width), 
+        height_(height) {
+
+        // Calculate raster length.
+        len_ = width * height * 4; // BGRA!
+        // Allocate memory.
+        raw_=std::make_unique<uint8_t[]>(len_);
+    }  
+
+    native_raster::~native_raster() {}
+
+    int native_raster::width() const {
+        return width_;
+    }
+
+    int native_raster::height() const {
+        return height_;
+    }
+
+    uint8_t* native_raster::raw() const {
+        return raw_.get();
     }
 
 #endif

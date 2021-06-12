@@ -1,7 +1,7 @@
 //
 // native_raster.cpp
 // 
-// Native raster (X11) format (for easy blitting).
+// Native raster (sdl) format (for easy blitting).
 // 
 // (c) 2021 Tomaz Stih
 // This code is licensed under MIT license (see LICENSE.txt for details).
@@ -29,9 +29,7 @@ namespace nice {
         raw_=std::make_unique<uint8_t[]>(len_);
     }  
 
-    native_raster::~native_raster() {
-
-    }
+    native_raster::~native_raster() {}
 
     int native_raster::width() const {
         return width_;
