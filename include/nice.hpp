@@ -608,7 +608,8 @@ namespace nice {
     class app {
     public:
         // Cmd line arguments.
-        static std::vector<std::string> args;
+        static int argc;
+        static char **argv;
 
         // Return code.
         static int ret_code;
@@ -647,7 +648,8 @@ namespace nice {
 
 
     int app::ret_code = 0;
-    std::vector<std::string> app::args;
+    int app::argc = 0;
+    char **app::argv = nullptr;
     bool app::primary_ = false;
     app_instance app::instance_;
 
@@ -660,7 +662,7 @@ namespace nice {
     }
 
     std::string app::name() {
-        return std::filesystem::path(args[0]).stem().string();
+        return std::filesystem::path(argv[0]).stem().string();
     }
     void wnd::repaint(void) { native()->repaint(); }
     
@@ -1447,7 +1449,6 @@ namespace nice {
         SDL_SetWindowPosition(winst_,location.x, location.y);
     }
 
-    // TODO: Implement.
     rct native_wnd::get_paint_area() {
         int w,h;
         ::SDL_GetWindowSize(winst_, &w, &h);
@@ -1596,13 +1597,12 @@ int WINAPI WinMain(
     _In_ LPSTR lpCmdLine,
     _In_ int nShowCmd)
 {
-    // Store cmd line arguments to vector.
-    int argc = __argc;
-    char** argv = __argv;
-    nice::app::instance(hInstance);
+    // Store cmd line arguments.
+    nice::app::argc = __argc;
+    nice::app::argv = __argv;
 
-    // Copy cmd line arguments to vector.
-    nice::app::args = std::vector<std::string>(argv, argv + argc);
+    // Store application instance.
+    nice::app::instance(hInstance);
 
     // Try becoming primary instance...
     nice::app::is_primary_instance();
@@ -1623,8 +1623,9 @@ int main(int argc, char* argv[]) {
     inst.display=::XOpenDisplay(NULL);
     nice::app::instance(inst);
 
-    // Copy cmd line arguments to vector.
-    nice::app::args = std::vector<std::string>(argv, argv + argc);
+    // Copy cmd line arguments.
+    nice::app::argc = argc;
+    nice::app::argv = argv;
 
     // Try becoming primary instance...
     nice::app::is_primary_instance();
@@ -1653,8 +1654,9 @@ int main(int argc, char* argv[]) {
     nice::app_instance inst=0;
     nice::app::instance(inst);
 
-    // Copy cmd line arguments to vector.
-    nice::app::args = std::vector<std::string>(argv, argv + argc);
+    // Copy cmd line arguments.
+    nice::app::argc = argc;
+    nice::app::argv = argv;
 
     // Try becoming primary instance...
     nice::app::is_primary_instance();

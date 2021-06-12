@@ -14,7 +14,8 @@ namespace nice {
 
 //{{BEGIN.DEF}}
     int app::ret_code = 0;
-    std::vector<std::string> app::args;
+    int app::argc = 0;
+    char **app::argv = nullptr;
     bool app::primary_ = false;
     app_instance app::instance_;
 
@@ -27,7 +28,7 @@ namespace nice {
     }
 
     std::string app::name() {
-        return std::filesystem::path(args[0]).stem().string();
+        return std::filesystem::path(argv[0]).stem().string();
     }
 //{{END.DEF}}
 

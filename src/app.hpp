@@ -20,7 +20,8 @@ namespace nice {
     class app {
     public:
         // Cmd line arguments.
-        static std::vector<std::string> args;
+        static int argc;
+        static char **argv;
 
         // Return code.
         static int ret_code;

@@ -19,8 +19,9 @@ int main(int argc, char* argv[]) {
     inst.display=::XOpenDisplay(NULL);
     nice::app::instance(inst);
 
-    // Copy cmd line arguments to vector.
-    nice::app::args = std::vector<std::string>(argv, argv + argc);
+    // Copy cmd line arguments.
+    nice::app::argc = argc;
+    nice::app::argv = argv;
 
     // Try becoming primary instance...
     nice::app::is_primary_instance();

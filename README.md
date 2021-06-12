@@ -88,6 +88,12 @@ The build command is
 make x11
 ~~~
 
+or 
+
+~~~
+make sdl
+~~~
+
 # Status
 
 ## Done
@@ -99,9 +105,9 @@ make x11
  * mapping window messages to C++ signals
  * basic paint proof of concept
  * refactoring no 2
- * scribble app
 
 ## Implementing
+ * scribble app
  * basic layout manager POC
  * calculator app
  * refactoring no 3

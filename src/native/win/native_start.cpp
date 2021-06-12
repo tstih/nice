@@ -19,13 +19,12 @@ int WINAPI WinMain(
     _In_ LPSTR lpCmdLine,
     _In_ int nShowCmd)
 {
-    // Store cmd line arguments to vector.
-    int argc = __argc;
-    char** argv = __argv;
-    nice::app::instance(hInstance);
+    // Store cmd line arguments.
+    nice::app::argc = __argc;
+    nice::app::argv = __argv;
 
-    // Copy cmd line arguments to vector.
-    nice::app::args = std::vector<std::string>(argv, argv + argc);
+    // Store application instance.
+    nice::app::instance(hInstance);
 
     // Try becoming primary instance...
     nice::app::is_primary_instance();
