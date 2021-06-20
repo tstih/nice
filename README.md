@@ -94,7 +94,7 @@ or
 make sdl
 ~~~
 
-After the compilation, samples in the `build` folder, and the `nice.hpp`
+After the compilation, samples are in the `build` folder, and the `nice.hpp`
 single header library is in the `include` folder.
 
 # Status on 20-Jun 2021
