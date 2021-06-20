@@ -191,33 +191,6 @@ namespace nice {
         int value() { return pixel_; }
     };
 
-    template<typename T, T N = nullptr>
-    class resource {
-    public:
-        // Create and destroy pattern.
-        virtual T create() = 0;
-        virtual void destroy() noexcept = 0;
-
-        // Id setter.
-        virtual void instance(T instance) const { instance_ = instance; }
-
-        // Id getter with lazy eval.
-        virtual T instance() const {
-            // Lazy evaluate by callign create.
-            if (instance_ == N)
-                instance_ = const_cast<resource<T, N>*>(this)->create();
-            // Return.
-            return instance_;
-        }
-
-        bool initialized() {
-            return !(instance_ == N);
-        }
-
-    private:
-        // Store resource value here.
-        mutable T instance_{ N };
-    };
 
     template<typename T>
     class ro_property {
@@ -635,6 +608,93 @@ namespace nice {
         static app_instance instance_;     
     };
 
+    class wave {
+    public:
+        // Construct an audio class.
+        wave(const uint8_t *wav) {
+            // Get wave header.
+            phdr = (header_s *)wav;
+        }
+        // Duration in seconds.
+        float duration_in_seconds() const {
+            return (float)phdr->overall_size / (float)phdr->byterate;
+        }
+        // Get overall size.
+        uint32_t len() const {
+            return phdr->overall_size;
+        }
+        // Get raw wave.
+        void* raw() const { return (void*)phdr; };
+
+    private:
+        // WAVE file header format. We are not the owner of the resource
+        // so we'll just store the pointer.
+        struct header_s {
+            uint8_t riff[4];                // RIFF string
+            uint32_t overall_size;		    // overall size of file in bytes
+            uint8_t wave[4];			    // WAVE string
+            uint8_t fmt_chunk_marker[4];    // fmt string with trailing null char
+            uint32_t length_of_fmt;		    // length of the format data
+            uint16_t format_type;		    // format type. 1-PCM, 3- IEEE float, 6 - 8bit A law, 7 - 8bit mu law
+            uint16_t channels;			    // no.of channels
+            uint32_t sample_rate;		    // sampling rate (blocks per second)
+            uint32_t byterate;			    // SampleRate * NumChannels * BitsPerSample/8
+            uint16_t block_align;		    // NumChannels * BitsPerSample/8
+            uint16_t bits_per_sample;	    // bits per sample, 8- 8bits, 16- 16 bits etc
+            uint8_t data_chunk_header [4];	// DATA string or FLLR string
+            uint32_t data_size;				// NumSamples * NumChannels * BitsPerSample/8 - size of the next chunk that will be read
+            uint8_t data[0];                // Pointer to data.
+        } *phdr;
+    };
+
+#ifdef __WIN__
+    class native_audio {
+    public:
+        // Construct an audio class.
+        native_audio();
+        // Destructs the audio class.
+        virtual ~native_audio();
+        // Play wave.
+        void play_wave_async(const wave& w);
+    };
+
+#elif __X11__
+    class native_audio {
+    public:
+        // Construct an audio class.
+        native_audio();
+        // Destructs the audio class.
+        virtual ~native_audio();
+        // Play wave.
+        void play_wave_async(const wave& w);
+    };
+
+#elif __SDL__
+    class native_audio {
+    public:
+        // Construct an audio class.
+        native_audio();
+        // Destructs the audio class.
+        virtual ~native_audio();
+        // Play wave.
+        void play_wave_async(const wave& w);
+    };
+
+#endif
+    class audio {
+    public:
+        // Construct an audio class.
+        audio() : pimpl_(std::make_unique<native_audio>()) {}
+        // Destructs the audio class.
+        virtual ~audio() {}
+        // Play wave.
+        void play_wave_async(const wave& w) {
+            pimpl_->play_wave_async(w);
+        }
+    private:
+        std::unique_ptr<native_audio> pimpl_;
+    };
+
 
     constexpr percent operator "" _pc(long double dpc)
     {
@@ -1006,6 +1066,20 @@ namespace nice {
         return raw_.get();
     }
 
+    native_audio::native_audio()
+    {
+    }
+
+    native_audio::~native_audio()
+    {
+    }
+
+    void native_audio::play_wave_async(const wave& w)
+    {
+        
+    }
+
+
 #elif __X11__
 
     void artist::draw_line(color c, pt p1, pt p2) const {
@@ -1050,7 +1124,7 @@ namespace nice {
             canvas_.w, 
             canvas_.gc, 
             img, 
-            0, 0, 0, 0, 
+            0, 0, p.x, p.y, 
             rst.width(), rst.height());
         // We don't want our raster object wildly released by XDestroyImage.
         img->data=NULL;
@@ -1324,6 +1398,20 @@ namespace nice {
         return raw_.get();
     }
 
+    native_audio::native_audio()
+    {
+    }
+
+    native_audio::~native_audio()
+    {
+    }
+
+    void native_audio::play_wave_async(const wave& w)
+    {
+        
+    }
+
+
 #elif __SDL__
 
     void artist::draw_line(color c, pt p1, pt p2) const {
@@ -1584,6 +1672,49 @@ namespace nice {
         return raw_.get();
     }
 
+    native_audio::native_audio()
+    {
+    }
+
+    native_audio::~native_audio()
+    {
+    }
+
+    void native_audio::play_wave_async(const wave& w)
+    {
+        // Make SDL_RWops pointer from our wave memory
+        // so that it can be treated as a stream. 
+        SDL_RWops *rw_ops = SDL_RWFromMem(w.raw(), w.len());
+        if (rw_ops == nullptr)
+            return; // Something went wrong. 
+        // We'll map wave to SDL_AudioSpec struct. 
+        SDL_AudioSpec wav_spec;
+        Uint32 wav_length;
+        Uint8 *wav_buffer;
+        // Now load these structures with data from wave. 
+        // 1 means rw_ops will be released after this
+        if (!SDL_LoadWAV_RW(rw_ops, 1, &wav_spec, &wav_buffer, &wav_length))
+            return;
+        // Grab our default audio device.
+        SDL_AudioDeviceID did = SDL_OpenAudioDevice(
+            NULL,
+            0,
+            &wav_spec,
+            NULL, // Not interested in the changes you've made to play. 
+            SDL_AUDIO_ALLOW_ANY_CHANGE);
+
+        int success = SDL_QueueAudio(did, wav_buffer, wav_length);
+        SDL_PauseAudioDevice(did, 0);
+
+        // Sync.
+        SDL_Delay(1000 * w.duration_in_seconds());
+
+        // And now ...
+        SDL_CloseAudioDevice(did);
+        SDL_FreeWAV(wav_buffer);
+    }
+
+
 #endif
 
 }
@@ -1646,7 +1777,7 @@ extern void program();
 int main(int argc, char* argv[]) {
 
     // Init SDL.
-    if (::SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (::SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0) {
         throw_ex(nice::nice_exception,"SDL could not initialize.");
     }
 

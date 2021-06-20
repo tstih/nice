@@ -16,7 +16,7 @@ extern void program();
 int main(int argc, char* argv[]) {
 
     // Init SDL.
-    if (::SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (::SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0) {
         throw_ex(nice::nice_exception,"SDL could not initialize.");
     }
 

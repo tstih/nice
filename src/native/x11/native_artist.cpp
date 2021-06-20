@@ -57,7 +57,7 @@ namespace nice {
             canvas_.w, 
             canvas_.gc, 
             img, 
-            0, 0, 0, 0, 
+            0, 0, p.x, p.y, 
             rst.width(), rst.height());
         // We don't want our raster object wildly released by XDestroyImage.
         img->data=NULL;

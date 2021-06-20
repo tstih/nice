@@ -62,6 +62,15 @@ namespace nice {
 {{$INCLUDE DEC wnd.hpp}}
 {{$INCLUDE DEC app_wnd.hpp}}
 {{$INCLUDE DEC app.hpp}}
+{{$INCLUDE DEC wave.hpp}}
+#ifdef __WIN__
+{{$INCLUDE DEC native/win/native_audio.hpp}}
+#elif __X11__
+{{$INCLUDE DEC native/x11/native_audio.hpp}}
+#elif __SDL__
+{{$INCLUDE DEC native/sdl/native_audio.hpp}}
+#endif
+{{$INCLUDE DEC audio.hpp}}
 
 {{$INCLUDE DEF *.hpp}}
 
