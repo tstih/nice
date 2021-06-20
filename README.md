@@ -5,9 +5,9 @@
 by Tomaz Stih
 
 Nice is a modern C++ micro framework for building desktop applications
-that started as an excercise in modern C++ to refresh my skills. 
+that started as an excercise in modern C++.
 
-> It is an experimental development; unstable, and poorly documented. 
+> Nice is currently under heavy development; unstable, and poorly documented. 
 > It will live up to expectations. Just not now. Thank you for your patience.
 
 The philosophy of nice is to:
@@ -94,107 +94,20 @@ or
 make sdl
 ~~~
 
-# Status
+# Status on 20-Jun 2021
 
-## Done
- * proof of concept: hello world
- * transformed into single header library
- * ms windows binding
- * refactoring no 1
- * X11 binding
- * mapping window messages to C++ signals
- * basic paint proof of concept
- * refactoring no 2
+ - [x] Supported platforms: SDL, MS Windows and X11/XLib
+ - [x] Basic window 
+ - [x] Basic window messages
+ - [x] Main window and the application class
+ - [x] Proof of concept: drawing inside main window
+ - [x] Raw ARGB raster images 
+ - [ ] Playing wave file (60%).
 
-## Implementing
- * scribble app
- * basic layout manager POC
- * calculator app
- * refactoring no 3
-
-## Planning
- * custom controls
- * improve painting, optimize performance
- * refactoring no 4
- * multithreading operations
-
-
-# Nice tutorial
-
-Part 1: [Nice application.](https://github.com/tstih/nice/tree/master/doc/lesson1)
-
-Part 2: The build system
-
-Part 3: Basic windows.
-
-Part 4: Window message routing, and painting.
-
-Part 5: Porting nice to a new platform: X11
-
-Part 6: The Scrible!
-
-Part 6: Child windows and layout managers (unfinished)
-
-Part 7: Custom controls (unfinished)
-
-Part 8: Adding a handful of common controls (unfinished)
-
-Part 9: The style (unfinished)
-
-Part 10: At the end it's all about being nice (unfinished)
-
-
-# Bumps on the road
-
-The mistakes we made and lessons we took on the way.
-
-## To Wayland or not to Wayland?
-
-Perhaps one day we will Wayland, but at this moment we won't. Wayland is a technology for drawing things quickly. It has no widgets. If ~nice~ had been implemented on top of Wayland, it would have to re-implement many features that are already part of toolkits, such as GTK+ or QT.
-
-## Fluent interface
-
-Fluent interface was abandoned during the development. C++ is simply not there yet. A lot of magic with 
-templates has been tested, starting with [CRPT] (https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern), 
-and ending with [our own pattern](https://stackoverflow.com/questions/62995665/c-fluent-interface). 
-However, results were always too complicated and unreadable to include it into a library
-which strives to simplify desktop programming.
-
-## Friend "native" functions
-
-All classes have some native members, which should be visible in derived classes.
-An early effort to separate native code from the pure nice classes (for Microsoft Windows)
-featured a lot of friend functions. After initial refactoring they were replaced by static 
-member functions. Friends are just not friends when it comes to inheritance.
-
-## Closely coupled window and native window class
-
-We decoupled window and native window classes by using the *PImpl* pattern after
-the coupled classes became a real mess. 
-
-# Links
-
-Following were particularly useful when developing nice.
-
-How to handle windows state.
- * https://docs.microsoft.com/en-us/windows/win32/learnwin32/managing-application-state-
- * https://devblogs.microsoft.com/oldnewthing/20191014-00/?p=102992
-
-Signals.
- * https://schneegans.github.io/tutorials/2015/09/20/signal-slot
-
-Windows Fonts
- * http://winprog.org/tutorial/fonts.html
-
-User defined literals
- * https://akrzemi1.wordpress.com/2012/08/12/user-defined-literals-part-i/
-
-PIMPL for GUI
- * https://stackoverflow.com/questions/35191894/pimpl-with-inheritance-using-smart-pointer
-
-X Windows Samples
- * https://www.lemoda.net/c/index.html
-
+Sample projects (see folder `samples`)
+ * `1_minimal.cpp` Minimal application. 3 lines of code.
+ * `2_raster.cpp` Paint background and display raw ARGB raster image.
+ * `3_wave` Play wave file (synchronous!).
 
 [language.url]:   https://isocpp.org/
 [language.badge]: https://img.shields.io/badge/language-C++-blue.svg

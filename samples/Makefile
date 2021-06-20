@@ -6,9 +6,12 @@ LDFLAGS_SDL			= -lSDL2 -D__SDL__
 .PHONY: x11
 x11: 
 	$(CXX) -o $(BUILD_DIR)/minimal 1_minimal.cpp $(CXXFLAGS) $(LDFLAGS_X11)  
-	$(CXX) -o $(BUILD_DIR)/raster 2_raster.cpp tut_raster.cpp power_on_wav.cpp $(CXXFLAGS) $(LDFLAGS_X11) 
+	$(CXX) -o $(BUILD_DIR)/raster 2_raster.cpp resources/tut_raster.cpp $(CXXFLAGS) $(LDFLAGS_X11) 
+	$(CXX) -o $(BUILD_DIR)/sound 3_sound.cpp resources/power_on_wav.cpp $(CXXFLAGS) $(LDFLAGS_X11) 
+
 
 .PHONY: sdl
 sdl: 
 	$(CXX) -o $(BUILD_DIR)/minimal 1_minimal.cpp $(CXXFLAGS) $(LDFLAGS_SDL) 
-	$(CXX) -o $(BUILD_DIR)/raster 2_raster.cpp tut_raster.cpp power_on_wav.cpp $(CXXFLAGS) $(LDFLAGS_SDL) 
+	$(CXX) -o $(BUILD_DIR)/raster 2_raster.cpp resources/tut_raster.cpp $(CXXFLAGS) $(LDFLAGS_SDL) 
+	$(CXX) -o $(BUILD_DIR)/sound 3_sound.cpp resources/power_on_wav.cpp $(CXXFLAGS) $(LDFLAGS_SDL) 
