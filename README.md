@@ -94,6 +94,9 @@ or
 make sdl
 ~~~
 
+After the compilation, samples in the `build` folder, and the `nice.hpp`
+single header library is in the `include` folder.
+
 # Status on 20-Jun 2021
 
  - [x] Supported platforms: SDL, MS Windows and X11/XLib
@@ -107,7 +110,7 @@ make sdl
 Sample projects (see folder `samples`)
  * `1_minimal.cpp` Minimal application. 3 lines of code.
  * `2_raster.cpp` Paint background and display raw ARGB raster image.
- * `3_wave` Play wave file (synchronous!).
+ * `3_sound.cpp` Play wave file (synchronous!).
 
 [language.url]:   https://isocpp.org/
 [language.badge]: https://img.shields.io/badge/language-C++-blue.svg
